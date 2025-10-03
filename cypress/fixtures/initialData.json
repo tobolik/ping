@@ -1,0 +1,12 @@
+{
+  "settings": {
+    "soundsEnabled": true,
+    "voiceAssistEnabled": false
+  },
+  "playerDatabase": [
+    { "id": "1", "name": "Honza", "photo_url": "", "strengths": "", "weaknesses": "" },
+    { "id": "2", "name": "Pavel", "photo_url": "", "strengths": "", "weaknesses": "" },
+    { "id": "3", "name": "Tomáš", "photo_url": "", "strengths": "", "weaknesses": "" }
+  ],
+  "tournaments": []
+}

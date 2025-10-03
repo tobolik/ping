@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test API</title>
+</head>
+<body>
+    <h1>Test API</h1>
+    <button onclick="testAPI()">Test API</button>
+    <div id="result"></div>
+
+    <script>
+    async function testAPI() {
+        try {
+            const response = await fetch('api.php?action=get_players');
+            const text = await response.text();
+            console.log('Raw response:', text);
+            
+            const data = JSON.parse(text);
+            document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('result').innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+        }
+    }
+    </script>
+</body>
+</html>

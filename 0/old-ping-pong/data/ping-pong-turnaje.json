@@ -1,0 +1,208 @@
+{
+  "settings": {
+    "soundsEnabled": true
+  },
+  "playerDatabase": [
+    {
+      "id": 1758439502226,
+      "name": "Honza",
+      "photoUrl": "",
+      "strengths": "",
+      "weaknesses": ""
+    },
+    {
+      "id": 1758439519064,
+      "name": "Martin",
+      "photoUrl": "",
+      "strengths": "",
+      "weaknesses": ""
+    },
+    {
+      "id": 1758439627260,
+      "name": "Martin D",
+      "photoUrl": "",
+      "strengths": "",
+      "weaknesses": ""
+    },
+    {
+      "id": 1758716448756,
+      "name": "Martin K",
+      "photoUrl": "",
+      "strengths": "",
+      "weaknesses": ""
+    },
+    {
+      "id": 1758439513538,
+      "name": "Ondra",
+      "photoUrl": "",
+      "strengths": "",
+      "weaknesses": ""
+    }
+  ],
+  "tournaments": [
+    {
+      "id": 1758717618053,
+      "name": "Turnaj II. 24. 9. 2025",
+      "pointsToWin": 11,
+      "createdAt": "2025-09-24T12:40:18.053Z",
+      "isLocked": true,
+      "playerIds": [
+        1758439502226,
+        1758439513538,
+        1758439627260,
+        1758716448756
+      ],
+      "matches": [
+        {
+          "id": "1758439502226-1758439627260-1758717618054",
+          "player1Id": 1758439502226,
+          "player2Id": 1758439627260,
+          "score1": 11,
+          "score2": 6,
+          "completed": true,
+          "firstServer": 1,
+          "servingPlayer": 1,
+          "serviceCount": 2
+        },
+        {
+          "id": "1758439513538-1758439627260-1758717618054",
+          "player1Id": 1758439513538,
+          "player2Id": 1758439627260,
+          "score1": 11,
+          "score2": 4,
+          "completed": true,
+          "firstServer": 1,
+          "servingPlayer": 2,
+          "serviceCount": 2
+        },
+        {
+          "id": "1758439627260-1758716448756-1758717618054",
+          "player1Id": 1758439627260,
+          "player2Id": 1758716448756,
+          "score1": 11,
+          "score2": 8,
+          "completed": true,
+          "firstServer": 2,
+          "servingPlayer": 1,
+          "serviceCount": 2
+        },
+        {
+          "id": "1758439513538-1758716448756-1758717618054",
+          "player1Id": 1758439513538,
+          "player2Id": 1758716448756,
+          "score1": 11,
+          "score2": 6,
+          "completed": true,
+          "firstServer": 1,
+          "servingPlayer": 1,
+          "serviceCount": 2
+        },
+        {
+          "id": "1758439502226-1758439513538-1758717618054",
+          "player1Id": 1758439502226,
+          "player2Id": 1758439513538,
+          "score1": 11,
+          "score2": 9,
+          "completed": true,
+          "firstServer": 1,
+          "servingPlayer": 1,
+          "serviceCount": 1
+        },
+        {
+          "id": "1758439502226-1758716448756-1758717618054",
+          "player1Id": 1758439502226,
+          "player2Id": 1758716448756,
+          "score1": 11,
+          "score2": 5,
+          "completed": true,
+          "firstServer": 2,
+          "servingPlayer": 2,
+          "serviceCount": 1
+        }
+      ]
+    },
+    {
+      "id": 1758716427600,
+      "name": "Turnaj I. 24. 9. 2025",
+      "pointsToWin": 11,
+      "createdAt": "2025-09-24T12:20:27.600Z",
+      "isLocked": true,
+      "playerIds": [
+        1758439502226,
+        1758439513538,
+        1758439627260,
+        1758716448756
+      ],
+      "matches": [
+        {
+          "id": "1758439502226-1758439627260-1758716427600",
+          "player1Id": 1758439502226,
+          "player2Id": 1758439627260,
+          "score1": 9,
+          "score2": 11,
+          "completed": true,
+          "firstServer": 1,
+          "servingPlayer": 1,
+          "serviceCount": 1
+        },
+        {
+          "id": "1758439513538-1758439627260-1758716427600",
+          "player1Id": 1758439513538,
+          "player2Id": 1758439627260,
+          "score1": 11,
+          "score2": 5,
+          "completed": true,
+          "firstServer": 1,
+          "servingPlayer": 1,
+          "serviceCount": 1
+        },
+        {
+          "id": "1758439502226-1758439513538-1758716427600",
+          "player1Id": 1758439502226,
+          "player2Id": 1758439513538,
+          "score1": 8,
+          "score2": 11,
+          "completed": true,
+          "firstServer": 2,
+          "servingPlayer": 1,
+          "serviceCount": 2
+        },
+        {
+          "id": "1758439502226-1758716448756-1758716449797",
+          "player1Id": 1758439502226,
+          "player2Id": 1758716448756,
+          "score1": 11,
+          "score2": 1,
+          "completed": true,
+          "firstServer": 2,
+          "servingPlayer": 2,
+          "serviceCount": 1
+        },
+        {
+          "id": "1758439513538-1758716448756-1758716449797",
+          "player1Id": 1758439513538,
+          "player2Id": 1758716448756,
+          "score1": 11,
+          "score2": 9,
+          "completed": true,
+          "firstServer": 1,
+          "servingPlayer": 1,
+          "serviceCount": 1
+        },
+        {
+          "id": "1758439627260-1758716448756-1758716449797",
+          "player1Id": 1758439627260,
+          "player2Id": 1758716448756,
+          "score1": 7,
+          "score2": 11,
+          "completed": true,
+          "firstServer": 2,
+          "servingPlayer": 1,
+          "serviceCount": 1
+        }
+      ]
+    }
+  ],
+  "activeTournamentId": 1758787517265,
+  "activeMatchId": null
+}

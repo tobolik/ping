@@ -39,6 +39,16 @@ if ($method === 'POST') {
             case 'deletePlayer': handleDeletePlayer($conn, $payload); break;
             case 'deleteTournament': handleDeleteTournament($conn, $payload); break;
             case 'saveSettings': handleSaveSettings($conn, $payload); break;
+            case 'reorderMatches': 
+                handleReorderMatches($conn, $payload);
+                $conn->commit();
+                echo json_encode(['success' => true]);
+                exit();
+            case 'swapSides':
+                handleSwapSides($conn, $payload);
+                $conn->commit();
+                echo json_encode(['success' => true]);
+                exit();
             case 'toggleTournamentLock':
                 handleToggleTournamentLock($conn, $payload);
                 $conn->commit();
@@ -107,6 +117,54 @@ function getNextEntityId($conn, $tableName) {
 }
 
 // --- AKCE ---
+
+function handleReorderMatches($conn, $payload) {
+    $matchIds = $payload['matchIds'] ?? [];
+    if (empty($matchIds)) return;
+
+    $stmt = $conn->prepare("UPDATE matches SET match_order = ? WHERE entity_id = ? AND valid_to IS NULL");
+    foreach ($matchIds as $order => $matchId) {
+        $stmt->bind_param("ii", $order, $matchId);
+        $stmt->execute();
+    }
+}
+
+function handleSwapSides($conn, $payload) {
+    $matchId = $payload['matchId'] ?? null;
+    if (!$matchId) return;
+    $matchId = intval($matchId);
+
+    // 1. Najdeme aktuální záznam
+    $stmt = $conn->prepare("SELECT tournament_id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped FROM matches WHERE entity_id = ? AND valid_to IS NULL");
+    $stmt->bind_param("i", $matchId);
+    $stmt->execute();
+    $dbMatch = $stmt->get_result()->fetch_assoc();
+
+    if ($dbMatch) {
+        // 2. Zneplatníme starý záznam
+        $stmtUpdate = $conn->prepare("UPDATE matches SET valid_to = NOW() WHERE entity_id = ? AND valid_to IS NULL");
+        $stmtUpdate->bind_param("i", $matchId);
+        $stmtUpdate->execute();
+
+        // 3. Vložíme nový záznam s prohozenou hodnotou
+        $newSidesSwapped = !$dbMatch['sides_swapped'];
+        $stmtInsert = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtInsert->bind_param("iiiiiiiiiii", 
+            $matchId, 
+            $dbMatch['tournament_id'], 
+            $dbMatch['player1_id'], 
+            $dbMatch['player2_id'], 
+            $dbMatch['score1'], 
+            $dbMatch['score2'], 
+            $dbMatch['completed'], 
+            $dbMatch['first_server'], 
+            $dbMatch['serving_player'], 
+            $dbMatch['match_order'], 
+            $newSidesSwapped
+        );
+        $stmtInsert->execute();
+    }
+}
 
 function handleCreateTournament($conn, $payload) {
     $tournamentEntityId = getNextEntityId($conn, 'tournaments');
@@ -246,18 +304,18 @@ function handleUpdateMatch($conn, $payload) {
     $id = $payload['id'];
     $data = $payload['data'];
     
-    $stmt = $conn->prepare("SELECT score1, score2, completed, first_server, serving_player FROM matches WHERE entity_id = ? AND valid_to IS NULL");
+    $stmt = $conn->prepare("SELECT score1, score2, completed, first_server, serving_player, sides_swapped FROM matches WHERE entity_id = ? AND valid_to IS NULL");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $dbMatch = $stmt->get_result()->fetch_assoc();
 
-    if ($dbMatch && ($dbMatch['score1'] != $data['score1'] || $dbMatch['score2'] != $data['score2'] || $dbMatch['completed'] != $data['completed'] || $dbMatch['first_server'] != $data['firstServer'] || $dbMatch['serving_player'] != $data['servingPlayer'])) {
+    if ($dbMatch && ($dbMatch['score1'] != $data['score1'] || $dbMatch['score2'] != $data['score2'] || $dbMatch['completed'] != $data['completed'] || $dbMatch['first_server'] != $data['firstServer'] || $dbMatch['serving_player'] != $data['servingPlayer'] || $dbMatch['sides_swapped'] != $data['sidesSwapped'])) {
         $stmtUpdate = $conn->prepare("UPDATE matches SET valid_to = NOW() WHERE entity_id = ? AND valid_to IS NULL");
         $stmtUpdate->bind_param("i", $id);
         $stmtUpdate->execute();
 
-        $stmtInsert = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, match_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmtInsert->bind_param("iiiiiiiiii", $id, $data['tournament_id'], $data['player1Id'], $data['player2Id'], $data['score1'], $data['score2'], $data['completed'], $data['firstServer'], $data['servingPlayer'], $data['match_order']);
+        $stmtInsert = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtInsert->bind_param("iiiiiiiiiii", $id, $data['tournament_id'], $data['player1Id'], $data['player2Id'], $data['score1'], $data['score2'], $data['completed'], $data['firstServer'], $data['servingPlayer'], $data['match_order'], $data['sidesSwapped']);
         $stmtInsert->execute();
     }
 }
@@ -326,7 +384,7 @@ function handleGetData($conn) {
     $tournaments = $tournamentsResult->fetch_all(MYSQLI_ASSOC);
     
     $tournamentPlayersStmt = $conn->prepare("SELECT player_id FROM tournament_players WHERE tournament_id = ? AND valid_to IS NULL ORDER BY player_order");
-    $matchesStmt = $conn->prepare("SELECT entity_id as id, player1_id, player2_id, score1, score2, completed, first_server, serving_player FROM matches WHERE tournament_id = ? AND valid_to IS NULL ORDER BY match_order");
+    $matchesStmt = $conn->prepare("SELECT entity_id as id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, sides_swapped FROM matches WHERE tournament_id = ? AND valid_to IS NULL ORDER BY match_order ASC, id ASC");
 
     foreach ($tournaments as &$tournament) {
         $t_id = intval($tournament['id']);
