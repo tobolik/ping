@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const screens = { main: document.getElementById('main-screen'), playerDb: document.getElementById('player-db-screen'), tournament: document.getElementById('tournament-screen'), game: document.getElementById('game-screen'), stats: document.getElementById('stats-screen'), overallStats: document.getElementById('overall-stats-screen') };
     const modalsContainer = document.getElementById('modals-container');
     const STORAGE_KEY = 'pingPongTournamentData';
-    const API_URL = 'api/index.php'; // Přidáme konstantu pro URL API
+    const API_URL = 'api.php'; // Přidáme konstantu pro URL API
     let audioContext;
 
     const saveState = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
