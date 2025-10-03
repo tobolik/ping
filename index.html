@@ -101,6 +101,13 @@
                                     <div class="absolute left-0 top-0 w-5 h-5 bg-white rounded-full shadow transform transition-transform toggle-label"></div>
                                 </div>
                             </label>
+                            <label for="voice-assist-toggle" class="cursor-pointer flex items-center justify-between">
+                                <span class="flex items-center"><i class="fa-solid fa-microphone-lines w-6 mr-2"></i>Hlas</span>
+                                <input type="checkbox" id="voice-assist-toggle" data-action="toggle-voice-assist" class="sr-only">
+                                <div class="relative w-10 h-5 bg-gray-300 rounded-full transition-colors toggle-checkbox">
+                                    <div class="absolute left-0 top-0 w-5 h-5 bg-white rounded-full shadow transform transition-transform toggle-label"></div>
+                                </div>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -135,7 +142,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    let state = { settings: { soundsEnabled: true }, playerDatabase: [], tournaments: [], activeTournamentId: null, activeMatchId: null };
+    let state = { settings: { soundsEnabled: true, voiceAssistEnabled: false }, playerDatabase: [], tournaments: [], activeTournamentId: null, activeMatchId: null };
     const playerColors = ["bg-red-500", "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-yellow-500", "bg-pink-500", "bg-indigo-500", "bg-teal-500"];
     const app = document.getElementById('app');
     const screens = { main: document.getElementById('main-screen'), playerDb: document.getElementById('player-db-screen'), tournament: document.getElementById('tournament-screen'), game: document.getElementById('game-screen'), stats: document.getElementById('stats-screen'), overallStats: document.getElementById('overall-stats-screen') };
@@ -143,9 +150,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const STORAGE_KEY = 'pingPongTournamentData';
     const API_URL = 'api.php'; // Přidáme konstantu pro URL API
     let audioContext;
+    let synth = window.speechSynthesis;
+    let utterance = new SpeechSynthesisUtterance();
 
     const updateStateWithApiData = (data) => {
-        state.settings = data.settings || { soundsEnabled: true };
+        state.settings = data.settings || { soundsEnabled: true, voiceAssistEnabled: false };
         state.playerDatabase = data.playerDatabase.map(p => ({
             id: parseInt(p.id, 10),
             name: p.name,
@@ -221,6 +230,15 @@ document.addEventListener('DOMContentLoaded', () => {
         gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.1);
         oscillator.start(audioContext.currentTime); oscillator.stop(audioContext.currentTime + 0.1);
+    }
+    
+    function speak(text, force = false) {
+        if ((!state.settings.voiceAssistEnabled && !force) || !synth) return;
+        // Zrušíme předchozí výstup, pokud nějaký je, aby se zprávy nekumulovaly
+        synth.cancel(); 
+        utterance.text = text;
+        utterance.lang = 'cs-CZ';
+        synth.speak(utterance);
     }
     
     function initializeAudio() { if (!audioContext) { audioContext = new (window.AudioContext || window.webkitAudioContext)(); } }
@@ -500,6 +518,20 @@ document.addEventListener('DOMContentLoaded', () => {
             recalculateServiceState(m, t.pointsToWin);
             playSound(playerIndex);
             
+            const p1 = getGlobalPlayer(m.player1Id);
+            const p2 = getGlobalPlayer(m.player2Id);
+            const servingPlayerName = m.servingPlayer === 1 ? p1.name : p2.name;
+            
+            let servingPlayerScore, otherPlayerScore;
+            if (m.servingPlayer === 1) {
+                servingPlayerScore = m.score1;
+                otherPlayerScore = m.score2;
+            } else {
+                servingPlayerScore = m.score2;
+                otherPlayerScore = m.score1;
+            }
+            speak(`${servingPlayerScore} : ${otherPlayerScore} Podává ${servingPlayerName}`);
+
             const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
             await apiCall('updateMatch', { id: m.id, data: matchPayload });
             
@@ -711,14 +743,31 @@ document.addEventListener('DOMContentLoaded', () => {
         'close-and-home':()=>{closeModal();renderMainScreen();},
         'export-data':()=>{if(state.tournaments.length===0&&state.playerDatabase.length===0){alert("Není co exportovat.");return;}const dataStr=JSON.stringify(state,null,2);const dataBlob=new Blob([dataStr],{type:'application/json'});const url=URL.createObjectURL(dataBlob);const a=document.createElement('a');a.href=url;a.download='ping-pong-turnaje.json';a.click();URL.revokeObjectURL(url);},
         'close-modal': closeModal,
-        'toggle-settings-menu': () => { const menu = document.getElementById('settings-menu'); menu.classList.toggle('hidden'); if(!menu.classList.contains('hidden')) { document.getElementById('sound-toggle').checked = state.settings.soundsEnabled; } },
+        'toggle-settings-menu': () => { 
+            const menu = document.getElementById('settings-menu'); 
+            menu.classList.toggle('hidden'); 
+            if(!menu.classList.contains('hidden')) { 
+                document.getElementById('sound-toggle').checked = state.settings.soundsEnabled; 
+                document.getElementById('voice-assist-toggle').checked = state.settings.voiceAssistEnabled;
+            } 
+        },
         'toggle-sound-ingame': () => { 
             state.settings.soundsEnabled = !state.settings.soundsEnabled; 
-            // Zde by v budoucnu bylo apiCall('updateSettings', ...)
+            apiCall('saveSettings', { key: 'soundsEnabled', value: state.settings.soundsEnabled });
             renderGameBoard(); 
         },
+        'toggle-voice-assist-ingame': () => {
+            state.settings.voiceAssistEnabled = !state.settings.voiceAssistEnabled;
+            apiCall('saveSettings', { key: 'voiceAssistEnabled', value: state.settings.voiceAssistEnabled });
+            if (state.settings.voiceAssistEnabled) {
+                speak("Hlasový asistent zapnut.");
+            } else {
+                speak("Hlasový asistent vypnut.", true);
+            }
+            renderGameBoard();
+        },
         'quick-edit-name': (target) => { const textEl = document.getElementById('tournament-name-text'); const oldName = textEl.textContent; const input = document.createElement('input'); input.type = 'text'; input.value = oldName; input.className = 'text-3xl font-bold bg-white border rounded w-full'; textEl.parentElement.replaceChild(input, textEl); input.focus(); const save = async () => { const newName = input.value.trim(); const t = getTournament(); if(newName) { t.name = newName; } await apiCall('updateTournament', { id: t.id, data: t }); renderTournamentScreen(); }; input.addEventListener('blur', save); input.addEventListener('keydown', (e) => { if(e.key === 'Enter') save(); if(e.key === 'Escape') { input.value = oldName; save(); } }); },
-        'move-match': async (target) => { 
+        'move-match': (target) => { 
             const t = getTournament(); 
             const { id, dir } = target.dataset; 
             const upcoming = t.matches.filter(m => !m.completed); 
@@ -753,10 +802,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target && allActions[target.dataset.action]) allActions[target.dataset.action](target); 
     });
     app.addEventListener('change', (e) => {
-        const target = e.target.closest('[data-action="toggle-sound"]');
-        if (target) { 
-            state.settings.soundsEnabled = target.checked; 
-            // Zde by v budoucnu bylo apiCall('updateSettings', ...)
+        const soundToggle = e.target.closest('[data-action="toggle-sound"]');
+        if (soundToggle) { 
+            state.settings.soundsEnabled = soundToggle.checked;
+            apiCall('saveSettings', { key: 'soundsEnabled', value: state.settings.soundsEnabled });
+        }
+        const voiceToggle = e.target.closest('[data-action="toggle-voice-assist"]');
+        if (voiceToggle) {
+            state.settings.voiceAssistEnabled = voiceToggle.checked;
+            apiCall('saveSettings', { key: 'voiceAssistEnabled', value: state.settings.voiceAssistEnabled });
+            if (state.settings.voiceAssistEnabled) {
+                // Krátká prodleva, aby se případně stihlo zavřít menu
+                setTimeout(() => speak("Hlasový asistent zapnut."), 100);
+            }
         }
     });
     document.getElementById('import-file').addEventListener('change', (event) => {
@@ -791,7 +849,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const canAddPoints = !winner;
         const p1Color = playerColors[t.playerIds.indexOf(p1.id) % playerColors.length];
         const p2Color = playerColors[t.playerIds.indexOf(p2.id) % playerColors.length];
-        renderGameScreen(`<div class="h-full flex flex-col"><header class="bg-white/90 backdrop-blur-sm p-3 shadow-sm text-center flex justify-between items-center w-full z-10 flex-shrink-0"><button data-action="back-to-tournament" class="btn btn-secondary !p-2 w-24">Přerušit</button><div class="flex-grow"><p class="text-sm text-gray-500">Hraje se na ${t.pointsToWin} bodů</p><p class="font-semibold">Podání: ${m.servingPlayer ? (m.servingPlayer === 1 ? p1.name : p2.name) : '...'}</p></div><div class="w-24 flex justify-end"><button data-action="toggle-sound-ingame" class="btn btn-secondary !p-0 h-10 w-10 text-lg" title="Zapnout/vypnout zvuky">${state.settings.soundsEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>'}</button></div></header><div class="flex-grow flex flex-col md:flex-row"><div ${canAddPoints ? `data-action="add-point" data-player="1"` : ''} class="player-score-box ${p1Color} p-4 text-white relative flex flex-col items-center justify-center flex-grow ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">${m.servingPlayer === 1 ? `<div class="absolute top-4 left-4 w-10 h-10 rounded-full bg-yellow-400/90 text-2xl flex items-center justify-center">🏓</div>` : ''}<button data-action="subtract-point" data-player="1" class="absolute top-4 right-4 w-12 h-12 bg-black/20 rounded-full text-2xl">-1</button><div class="text-2xl md:text-3xl font-bold">${p1.name}</div><div class="text-8xl md:text-9xl font-extrabold my-4">${m.score1}</div><div class="text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div></div><div ${canAddPoints ? `data-action="add-point" data-player="2"` : ''} class="player-score-box ${p2Color} p-4 text-white relative flex flex-col items-center justify-center flex-grow ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">${m.servingPlayer === 2 ? `<div class="absolute top-4 left-4 w-10 h-10 rounded-full bg-yellow-400/90 text-2xl flex items-center justify-center">🏓</div>` : ''}<button data-action="subtract-point" data-player="2" class="absolute top-4 right-4 w-12 h-12 bg-black/20 rounded-full text-2xl">-1</button><div class="text-2xl md:text-3xl font-bold">${p2.name}</div><div class="text-8xl md:text-9xl font-extrabold my-4">${m.score2}</div><div class="text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div></div></div>${winner ? `<div class="absolute bottom-4 left-4 right-4 bg-white p-6 rounded-xl shadow-lg text-center space-y-3 z-20"><div class="text-3xl">🏆</div><h2 class="text-2xl font-bold">Vítěz: ${winner === 1 ? p1.name : p2.name}!</h2><p class="text-gray-500">Výsledek: ${m.score1} : ${m.score2}</p><button data-action="save-match-result" class="btn btn-primary w-full">Uložit výsledek</button></div>` : ''}</div>`);
+        renderGameScreen(`<div class="h-full flex flex-col"><header class="bg-white/90 backdrop-blur-sm p-3 shadow-sm text-center flex justify-between items-center w-full z-10 flex-shrink-0"><button data-action="back-to-tournament" class="btn btn-secondary !p-2 w-24">Přerušit</button><div class="flex-grow"><p class="text-sm text-gray-500">Hraje se na ${t.pointsToWin} bodů</p><p class="font-semibold">Podání: ${m.servingPlayer ? (m.servingPlayer === 1 ? p1.name : p2.name) : '...'}</p></div><div class="w-24 flex justify-end gap-2"><button data-action="toggle-voice-assist-ingame" class="btn btn-secondary !p-0 h-10 w-10 text-lg" title="Zapnout/vypnout hlas">${state.settings.voiceAssistEnabled ? '<i class="fa-solid fa-comment-dots"></i>' : '<i class="fa-solid fa-comment-slash"></i>'}</button><button data-action="toggle-sound-ingame" class="btn btn-secondary !p-0 h-10 w-10 text-lg" title="Zapnout/vypnout zvuky">${state.settings.soundsEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>'}</button></div></header><div class="flex-grow flex flex-col md:flex-row"><div ${canAddPoints ? `data-action="add-point" data-player="1"` : ''} class="player-score-box ${p1Color} p-4 text-white relative flex flex-col items-center justify-center flex-grow ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">${m.servingPlayer === 1 ? `<div class="absolute top-4 left-4 w-10 h-10 rounded-full bg-yellow-400/90 text-2xl flex items-center justify-center">🏓</div>` : ''}<button data-action="subtract-point" data-player="1" class="absolute top-4 right-4 w-12 h-12 bg-black/20 rounded-full text-2xl">-1</button><div class="text-2xl md:text-3xl font-bold">${p1.name}</div><div class="text-8xl md:text-9xl font-extrabold my-4">${m.score1}</div><div class="text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div></div><div ${canAddPoints ? `data-action="add-point" data-player="2"` : ''} class="player-score-box ${p2Color} p-4 text-white relative flex flex-col items-center justify-center flex-grow ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">${m.servingPlayer === 2 ? `<div class="absolute top-4 left-4 w-10 h-10 rounded-full bg-yellow-400/90 text-2xl flex items-center justify-center">🏓</div>` : ''}<button data-action="subtract-point" data-player="2" class="absolute top-4 right-4 w-12 h-12 bg-black/20 rounded-full text-2xl">-1</button><div class="text-2xl md:text-3xl font-bold">${p2.name}</div><div class="text-8xl md:text-9xl font-extrabold my-4">${m.score2}</div><div class="text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div></div></div>${winner ? `<div class="absolute bottom-4 left-4 right-4 bg-white p-6 rounded-xl shadow-lg text-center space-y-3 z-20"><div class="text-3xl">🏆</div><h2 class="text-2xl font-bold">Vítěz: ${winner === 1 ? p1.name : p2.name}!</h2><p class="text-gray-500">Výsledek: ${m.score1} : ${m.score2}</p><button data-action="save-match-result" class="btn btn-primary w-full">Uložit výsledek</button></div>` : ''}</div>`);
+        if (winner) {
+            const winnerName = winner === 1 ? p1.name : p2.name;
+            const winnerScore = winner === 1 ? m.score1 : m.score2;
+            const loserScore = winner === 1 ? m.score2 : m.score1;
+            speak(`Konec zápasu. Vítěz je ${winnerName} s výsledkem ${winnerScore} : ${loserScore}`);
+        }
     };
 
     function renderStatsScreen() {

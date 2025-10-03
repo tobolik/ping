@@ -38,6 +38,7 @@ if ($method === 'POST') {
             case 'savePlayer': handleSavePlayer($conn, $payload); break;
             case 'deletePlayer': handleDeletePlayer($conn, $payload); break;
             case 'deleteTournament': handleDeleteTournament($conn, $payload); break;
+            case 'saveSettings': handleSaveSettings($conn, $payload); break;
             case 'toggleTournamentLock':
                 handleToggleTournamentLock($conn, $payload);
                 $conn->commit();
@@ -56,6 +57,48 @@ if ($method === 'POST') {
     }
     exit();
 }
+
+function handleSaveSettings($conn, $payload) {
+    $key = $payload['key'] ?? null;
+    $value = $payload['value'];
+
+    if (!$key) return;
+
+    // Najdeme existující záznam a jeho hodnotu
+    $stmtFind = $conn->prepare("SELECT entity_id, setting_value FROM settings WHERE setting_key = ? AND valid_to IS NULL");
+    $stmtFind->bind_param("s", $key);
+    $stmtFind->execute();
+    $result = $stmtFind->get_result();
+    $existingSetting = $result->fetch_assoc();
+
+    $dbValue = null;
+    if ($existingSetting) {
+        $dbValue = ($existingSetting['setting_value'] === 'true') ? true : (($existingSetting['setting_value'] === 'false') ? false : $existingSetting['setting_value']);
+    }
+
+    // Ukládáme jen pokud je hodnota jiná, nebo pokud záznam neexistuje
+    if (!$existingSetting || $dbValue !== $value) {
+        $entityId = null;
+        if ($existingSetting) {
+            $entityId = $existingSetting['entity_id'];
+        } else {
+            $result = $conn->query("SELECT MAX(entity_id) as max_id FROM `settings`");
+            $entityId = ($result->fetch_assoc()['max_id'] ?? 0) + 1;
+        }
+
+        if($existingSetting) {
+            $stmtUpdate = $conn->prepare("UPDATE settings SET valid_to = NOW() WHERE setting_key = ? AND valid_to IS NULL");
+            $stmtUpdate->bind_param("s", $key);
+            $stmtUpdate->execute();
+        }
+
+        $stringValue = is_bool($value) ? ($value ? 'true' : 'false') : strval($value);
+        $stmtInsert = $conn->prepare("INSERT INTO settings (entity_id, setting_key, setting_value) VALUES (?, ?, ?)");
+        $stmtInsert->bind_param("iss", $entityId, $key, $stringValue);
+        $stmtInsert->execute();
+    }
+}
+
 
 // --- HELPER ---
 function getNextEntityId($conn, $tableName) {
