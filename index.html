@@ -161,6 +161,11 @@ document.addEventListener('DOMContentLoaded', () => {
         "Nádhera.", "Neuvěřitelný reflex.", "To se cení.", "Hraje jako bůh.", "Z toho se nevyhrabe."
     ];
 
+    const winningPhrases = [
+        "To byla jízda!", "Gratulujeme vítězi!", "Nádherný výkon.", "Absolutně zasloužené vítězství.",
+        "A je to tam!", "Klobouk dolů.", "Tohle byl koncert.", "Bez šance.", "Famózní!"
+    ];
+
     const updateStateWithApiData = (data) => {
         state.settings = data.settings || { soundsEnabled: true, voiceAssistEnabled: false };
         state.playerDatabase = data.playerDatabase.map(p => ({
@@ -960,7 +965,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const winnerName = getGlobalPlayer(winnerId).name;
             const winnerScore = Math.max(m.score1, m.score2);
             const loserScore = Math.min(m.score1, m.score2);
-            speak(`Konec zápasu. Vítěz je ${winnerName} s výsledkem ${winnerScore} : ${loserScore}`);
+            const randomPhrase = winningPhrases[Math.floor(Math.random() * winningPhrases.length)];
+            speak(`Konec zápasu. Vítěz je ${winnerName} s výsledkem ${winnerScore} : ${loserScore}, ${randomPhrase}`);
         }
     };
 
