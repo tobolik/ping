@@ -470,8 +470,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const updateScore = (playerIndex, delta) => {
-        const t = getTournament(); const m = getMatch(t, state.activeMatchId);
+    const updateScore = async (playerIndex, delta) => {
+        const t = getTournament(); 
+        const m = getMatch(t, state.activeMatchId);
+        if (!t || !m) return;
+
         if (delta > 0 && checkWinCondition(m, t.pointsToWin)) return;
         
         const currentScore = m[`score${playerIndex}`];
@@ -480,7 +483,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             recalculateServiceState(m, t.pointsToWin);
             playSound(playerIndex);
-            saveState(); 
+            
+            const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
+            await apiCall('updateMatch', { id: m.id, data: matchPayload });
+            
             renderGameBoard();
         }
     };
@@ -635,7 +641,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!m || !t) return;
             m.firstServer = parseInt(target.dataset.player);
             recalculateServiceState(m, t.pointsToWin);
-            await saveState();
+
+            const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
+            await apiCall('updateMatch', { id: m.id, data: matchPayload });
+
             renderGameBoard();
         },
         'add-point': (target) => updateScore(parseInt(target.dataset.player), 1),
