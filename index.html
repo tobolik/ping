@@ -153,6 +153,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let synth = window.speechSynthesis;
     let utterance = new SpeechSynthesisUtterance();
 
+    const encouragingPhrases = [
+        "Pojď, draku!", "To byl úder!", "Skvělá práce!", "Jen tak dál!", "To je ono!",
+        "Paráda!", "Krásná hra.", "Nevadí, další míč je tvůj.", "Zaber!", "Soustřeď se.",
+        "Máš na to!", "Výborně!", "Neskutečné!", "Jak z partesu.", "Tohle se povedlo.",
+        "Ještě jeden!", "To je bojovník.", "Krásný bod.", "Ten má formu.", "To byla rychlost!",
+        "Nádhera.", "Neuvěřitelný reflex.", "To se cení.", "Hraje jako bůh.", "Z toho se nevyhrabe."
+    ];
+
     const updateStateWithApiData = (data) => {
         state.settings = data.settings || { soundsEnabled: true, voiceAssistEnabled: false };
         state.playerDatabase = data.playerDatabase.map(p => ({
@@ -236,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if ((!state.settings.voiceAssistEnabled && !force) || !synth) return;
         // Zrušíme předchozí výstup, pokud nějaký je, aby se zprávy nekumulovaly
         synth.cancel(); 
-        utterance.text = text;
+        let utterance = new SpeechSynthesisUtterance(text); // Vytvoříme novou instanci pro každou hlášku
         utterance.lang = 'cs-CZ';
         synth.speak(utterance);
     }
@@ -530,7 +538,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 servingPlayerScore = m.score2;
                 otherPlayerScore = m.score1;
             }
-            speak(`${servingPlayerScore} : ${otherPlayerScore} Podává ${servingPlayerName}`);
+            
+            let speechText = `${servingPlayerScore} : ${otherPlayerScore} Podává ${servingPlayerName}`;
+
+            // S pravděpodobností 40% přidáme náhodnou hlášku
+            if (Math.random() < 0.9) {
+                const randomPhrase = encouragingPhrases[Math.floor(Math.random() * encouragingPhrases.length)];
+                speechText += `. ${randomPhrase}`;
+            }
+
+            speak(speechText);
 
             const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
             await apiCall('updateMatch', { id: m.id, data: matchPayload });
