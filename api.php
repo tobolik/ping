@@ -38,6 +38,11 @@ if ($method === 'POST') {
             case 'savePlayer': handleSavePlayer($conn, $payload); break;
             case 'deletePlayer': handleDeletePlayer($conn, $payload); break;
             case 'deleteTournament': handleDeleteTournament($conn, $payload); break;
+            case 'toggleTournamentLock':
+                handleToggleTournamentLock($conn, $payload);
+                $conn->commit();
+                echo json_encode(['success' => true]);
+                exit();
             default:
                 http_response_code(400);
                 throw new Exception("Unknown action: $action");
@@ -46,7 +51,7 @@ if ($method === 'POST') {
         handleGetData($conn);
     } catch (Exception $e) {
         $conn->rollback();
-        http_response_code(500);
+    http_response_code(500);
         echo json_encode(['error' => 'Operation failed: ' . $e->getMessage()]);
     }
     exit();
@@ -75,7 +80,7 @@ function handleCreateTournament($conn, $payload) {
     }
 
     $nextMatchEntityId = getNextEntityId($conn, 'matches');
-    $matchStmt = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, match_order) VALUES (?, ?, ?, ?, ?)");
+    $matchStmt = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, match_order, score1, score2) VALUES (?, ?, ?, ?, ?, 0, 0)");
     $playerIds = $payload['playerIds'];
     $order = 0;
     for ($i = 0; $i < count($playerIds); $i++) {
@@ -85,6 +90,28 @@ function handleCreateTournament($conn, $payload) {
             $nextMatchEntityId++;
             $order++;
         }
+    }
+}
+
+function handleToggleTournamentLock($conn, $payload) {
+    $id = $payload['id'];
+    if (!$id) return;
+
+    $stmt = $conn->prepare("SELECT name, points_to_win, is_locked, valid_from FROM tournaments WHERE entity_id = ? AND valid_to IS NULL");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $dbTournament = $stmt->get_result()->fetch_assoc();
+
+    if ($dbTournament) {
+        $newIsLocked = !$dbTournament['is_locked'];
+
+        $stmtUpdate = $conn->prepare("UPDATE tournaments SET valid_to = NOW() WHERE entity_id = ? AND valid_to IS NULL");
+        $stmtUpdate->bind_param("i", $id);
+        $stmtUpdate->execute();
+        
+        $stmtInsert = $conn->prepare("INSERT INTO tournaments (entity_id, name, points_to_win, is_locked, valid_from) VALUES (?, ?, ?, ?, ?)");
+        $stmtInsert->bind_param("isiis", $id, $dbTournament['name'], $dbTournament['points_to_win'], $newIsLocked, $dbTournament['valid_from']);
+        $stmtInsert->execute();
     }
 }
 
@@ -114,13 +141,15 @@ function handleUpdateTournament($conn, $payload) {
     $dbPlayerIds = array_column($dbPlayers, 'player_id');
     $newPlayerIds = $data['playerIds'];
 
-    if ($dbPlayerIds != $newPlayerIds) {
+    $playersChanged = count($dbPlayerIds) !== count($newPlayerIds) || !empty(array_diff($dbPlayerIds, $newPlayerIds)) || !empty(array_diff($newPlayerIds, $dbPlayerIds));
+
+    if ($playersChanged) {
         $stmtInvalidateMatches = $conn->prepare("UPDATE matches SET valid_to = NOW() WHERE tournament_id = ? AND valid_to IS NULL");
         $stmtInvalidateMatches->bind_param("i", $id);
         $stmtInvalidateMatches->execute();
         
         $nextMatchEntityId = getNextEntityId($conn, 'matches');
-        $matchStmt = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, match_order) VALUES (?, ?, ?, ?, ?)");
+        $matchStmt = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, match_order, score1, score2) VALUES (?, ?, ?, ?, ?, 0, 0)");
         $order = 0;
         for ($i = 0; $i < count($newPlayerIds); $i++) {
             for ($j = $i + 1; $j < count($newPlayerIds); $j++) {
@@ -209,7 +238,7 @@ function handleSavePlayer($conn, $payload) {
             $stmtInsert->bind_param("issss", $id, $data['name'], $data['photoUrl'], $data['strengths'], $data['weaknesses']);
             $stmtInsert->execute();
         }
-    } else {
+} else {
         $nextEntityId = getNextEntityId($conn, 'players');
         $stmtInsert = $conn->prepare("INSERT INTO players (entity_id, name, photo_url, strengths, weaknesses) VALUES (?, ?, ?, ?, ?)");
         $stmtInsert->bind_param("issss", $nextEntityId, $data['name'], $data['photoUrl'], $data['strengths'], $data['weaknesses']);
