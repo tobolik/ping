@@ -108,6 +108,43 @@ Aplikace používá temporal versioning pattern - místo UPDATE se používají 
 
 Pro přidání nových sloupců nebo změny struktury použijte migrační skripty v SQL formátu.
 
+## 🎮 Funkcionality
+
+### Kopírování turnaje
+
+Aplikace umožňuje rychlé kopírování turnaje pro pokračování s novým turnajem:
+
+- **Kde najdete:** 
+  - V nastavení turnaje (tlačítko "Kopírovat turnaj")
+  - Po ukončení turnaje (tlačítko "Kopírovat turnaj" vedle "Zavřít")
+
+- **Co se zkopíruje:**
+  - Název turnaje (s automatickým číslem, např. "Turnaj (2)")
+  - Všichni hráči turnaje
+  - Všechny zápasy (s nulovými skóre)
+  - Nastavení počtu bodů k výhře
+
+- **Speciální funkce:**
+  - Automatické prohození stran hráčů (hráči, kteří hráli vlevo, budou vpravo a naopak)
+  - Nový turnaj je připraven k okamžitému spuštění
+
+### Vrácení posledního bodu (Undo)
+
+Během hry můžete vrátit poslední přidaný bod:
+
+- **Kde najdete:** Tlačítko "Vrátit poslední bod" v zobrazení vítěze zápasu
+- **Kdy je dostupné:** Pouze pokud byl přidán alespoň jeden bod
+- **Co se vrátí:** Poslední přidaný bod, stav podávání a stav prvního podávajícího
+
+### Klávesové zkratky
+
+Pro rychlejší ovládání hry jsou k dispozici klávesové zkratky:
+
+- **Šipka vlevo (←):** Přidá bod levému hráči
+- **Šipka vpravo (→):** Přidá bod pravému hráči
+
+**Poznámka:** Zkratky fungují pouze během aktivní hry, když není otevřený žádný modal nebo input field.
+
 ## 🔌 API
 
 ### Endpoint

@@ -285,6 +285,76 @@ last_sync (TIMESTAMP)
 
 **Chování:** Prohodí hodnotu `sides_swapped` v zápase
 
+#### Akce: `copy-tournament` (Frontend akce)
+
+**Chování:**
+- Vytvoří nový turnaj se stejným názvem + číslo v závorce (např. "Turnaj (2)")
+- Zkopíruje všechny hráče z původního turnaje
+- Vytvoří nové zápasy s nulovými skóre
+- Pro každý zápas nastaví `sidesSwapped: true` (prohodí strany hráčů)
+- Používá `createTournament` API akci, poté `updateMatch` pro každý zápas
+
+**Frontend implementace:**
+- Akce je dostupná v `allActions['copy-tournament']`
+- Zobrazuje se v nastavení turnaje a po ukončení turnaje
+- Automaticky generuje číslo kopie na základě existujících turnajů se stejným názvem
+
+## 🎮 Frontend funkcionality
+
+### Kopírování turnaje
+
+**Implementace:** `index.html`, akce `copy-tournament`
+
+**Workflow:**
+1. Najde základní název turnaje (bez čísla v závorce)
+2. Vygeneruje nový název s číslem (např. "Turnaj (2)")
+3. Vytvoří nový turnaj přes `createTournament` API
+4. Načte nový stav z API
+5. Pro každý zápas v novém turnaji nastaví `sidesSwapped: true` přes `updateMatch`
+
+**Důležité:**
+- Používá `$conn->insert_id` v PHP pro získání skutečného ID nového turnaje
+- Formát data pro MySQL: `YYYY-MM-DD HH:MM:SS` (ne ISO 8601)
+
+### Vrácení posledního bodu (Undo)
+
+**Implementace:** `index.html`, funkce `undoLastPoint()`
+
+**Workflow:**
+1. Před každým přidáním bodu se uloží aktuální stav do `state.scoreHistory`
+2. Stav obsahuje: `score1`, `score2`, `servingPlayer`, `firstServer`
+3. Tlačítko "Vrátit poslední bod" je dostupné pouze pokud `state.scoreHistory.length > 0`
+4. Po kliknutí se obnoví poslední stav z historie
+
+**State management:**
+```javascript
+state.scoreHistory = []  // Pole objektů s historií stavů
+```
+
+### Klávesové zkratky
+
+**Implementace:** `index.html`, event listener na `document.keydown`
+
+**Podporované zkratky:**
+- `ArrowLeft` - Přidá bod levému hráči (respektuje `sidesSwapped`)
+- `ArrowRight` - Přidá bod pravému hráči (respektuje `sidesSwapped`)
+
+**Podmínky aktivace:**
+- Hra musí být aktivní (`#game-screen` je viditelný)
+- Žádný modal nesmí být otevřený
+- Žádný input field nesmí být ve focusu
+
+**Logika:**
+```javascript
+if (sidesSwapped) {
+  ArrowLeft -> right player
+  ArrowRight -> left player
+} else {
+  ArrowLeft -> left player
+  ArrowRight -> right player
+}
+```
+
 ## 🔑 Klíčové konvence
 
 ### Temporal Versioning
@@ -343,6 +413,25 @@ KEY `idx_name` (`name`(191))
 2. Ověř, že databáze existuje
 3. Zkontroluj oprávnění uživatele
 
+### Problém: "Incorrect datetime value" při kopírování turnaje
+
+**Řešení:** Použij formát MySQL datetime (`YYYY-MM-DD HH:MM:SS`), ne ISO 8601:
+```javascript
+const mysqlDate = now.getFullYear() + '-' + 
+    String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+    String(now.getDate()).padStart(2, '0') + ' ' + 
+    String(now.getHours()).padStart(2, '0') + ':' + 
+    String(now.getMinutes()).padStart(2, '0') + ':' + 
+    String(now.getSeconds()).padStart(2, '0');
+```
+
+### Problém: Zápasy se nezkopírují při kopírování turnaje
+
+**Kontrola:**
+1. Ověř, že `handleCreateTournament` používá `$conn->insert_id` pro `tournament_id`
+2. Zkontroluj, že `handleUpdateMatch` správně zpracovává NULL hodnoty
+3. Ověř, že `sidesSwapped` je správně převedeno na integer (0/1)
+
 ## 📝 Poznámky pro vývoj
 
 ### Přidávání nových funkcí
@@ -392,4 +481,7 @@ grep -r "case '" api.php
 2. **Sloupec `sides_swapped` je povinný** v tabulce `matches`
 3. **Environment soubory necommitovat** - jsou v `.gitignore`
 4. **Temporal versioning** - nikdy neměň `valid_to` na existujících záznamech přímo
+5. **Formát data pro MySQL:** Používej `YYYY-MM-DD HH:MM:SS`, ne ISO 8601 (`toISOString()`)
+6. **NULL hodnoty v `handleUpdateMatch`:** Vždy normalizuj NULL hodnoty před porovnáním
+7. **`insert_id` v PHP:** Po `INSERT` vždy použij `$conn->insert_id` pro získání skutečného ID, ne `entity_id`
 

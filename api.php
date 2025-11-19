@@ -169,25 +169,46 @@ function handleSwapSides($conn, $payload) {
 function handleCreateTournament($conn, $payload) {
     $tournamentEntityId = getNextEntityId($conn, 'tournaments');
     $stmt = $conn->prepare("INSERT INTO tournaments (entity_id, name, points_to_win, valid_from) VALUES (?, ?, ?, ?)");
+    if (!$stmt) {
+        throw new Exception("Chyba při přípravě dotazu pro turnaj: " . $conn->error);
+    }
     $stmt->bind_param("isis", $tournamentEntityId, $payload['name'], $payload['pointsToWin'], $payload['createdAt']);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        throw new Exception("Chyba při vytváření turnaje: " . $stmt->error);
+    }
+    
+    // Získáme skutečné ID nově vytvořeného turnaje
+    $tournamentId = $conn->insert_id;
+    if (!$tournamentId || $tournamentId == 0) {
+        throw new Exception("Nepodařilo se získat ID nově vytvořeného turnaje. insert_id: " . $conn->insert_id);
+    }
 
     $nextTpEntityId = getNextEntityId($conn, 'tournament_players');
     $playerStmt = $conn->prepare("INSERT INTO tournament_players (entity_id, tournament_id, player_id, player_order) VALUES (?, ?, ?, ?)");
+    if (!$playerStmt) {
+        throw new Exception("Chyba při přípravě dotazu pro hráče turnaje: " . $conn->error);
+    }
     foreach ($payload['playerIds'] as $order => $playerId) {
-        $playerStmt->bind_param("iiii", $nextTpEntityId, $tournamentEntityId, $playerId, $order);
-        $playerStmt->execute();
+        $playerStmt->bind_param("iiii", $nextTpEntityId, $tournamentId, $playerId, $order);
+        if (!$playerStmt->execute()) {
+            throw new Exception("Chyba při vkládání hráče do turnaje: " . $playerStmt->error);
+        }
         $nextTpEntityId++;
     }
 
     $nextMatchEntityId = getNextEntityId($conn, 'matches');
     $matchStmt = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, match_order, score1, score2) VALUES (?, ?, ?, ?, ?, 0, 0)");
+    if (!$matchStmt) {
+        throw new Exception("Chyba při přípravě dotazu pro zápasy: " . $conn->error);
+    }
     $playerIds = $payload['playerIds'];
     $order = 0;
     for ($i = 0; $i < count($playerIds); $i++) {
         for ($j = $i + 1; $j < count($playerIds); $j++) {
-            $matchStmt->bind_param("iiiii", $nextMatchEntityId, $tournamentEntityId, $playerIds[$i], $playerIds[$j], $order);
-            $matchStmt->execute();
+            $matchStmt->bind_param("iiiii", $nextMatchEntityId, $tournamentId, $playerIds[$i], $playerIds[$j], $order);
+            if (!$matchStmt->execute()) {
+                throw new Exception("Chyba při vkládání zápasu: " . $matchStmt->error);
+            }
             $nextMatchEntityId++;
             $order++;
         }
@@ -309,14 +330,40 @@ function handleUpdateMatch($conn, $payload) {
     $stmt->execute();
     $dbMatch = $stmt->get_result()->fetch_assoc();
 
-    if ($dbMatch && ($dbMatch['score1'] != $data['score1'] || $dbMatch['score2'] != $data['score2'] || $dbMatch['completed'] != $data['completed'] || $dbMatch['first_server'] != $data['firstServer'] || $dbMatch['serving_player'] != $data['servingPlayer'] || $dbMatch['sides_swapped'] != $data['sidesSwapped'])) {
+    if (!$dbMatch) {
+        error_log("handleUpdateMatch: Zápas s entity_id $id nebyl nalezen");
+        return;
+    }
+
+    // Normalizace hodnot pro porovnání (NULL -> 0 nebo false)
+    $dbFirstServer = $dbMatch['first_server'] ?? null;
+    $dbServingPlayer = $dbMatch['serving_player'] ?? null;
+    $dbSidesSwapped = $dbMatch['sides_swapped'] ?? 0;
+    $dataFirstServer = $data['firstServer'] ?? null;
+    $dataServingPlayer = $data['servingPlayer'] ?? null;
+    $dataSidesSwapped = isset($data['sidesSwapped']) ? ($data['sidesSwapped'] ? 1 : 0) : 0;
+
+    // Porovnání hodnot s podporou NULL
+    $hasChanges = (
+        intval($dbMatch['score1']) != intval($data['score1']) ||
+        intval($dbMatch['score2']) != intval($data['score2']) ||
+        intval($dbMatch['completed']) != intval($data['completed']) ||
+        $dbFirstServer !== $dataFirstServer ||
+        $dbServingPlayer !== $dataServingPlayer ||
+        intval($dbSidesSwapped) != intval($dataSidesSwapped)
+    );
+
+    if ($hasChanges) {
         $stmtUpdate = $conn->prepare("UPDATE matches SET valid_to = NOW() WHERE entity_id = ? AND valid_to IS NULL");
         $stmtUpdate->bind_param("i", $id);
         $stmtUpdate->execute();
 
         $stmtInsert = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmtInsert->bind_param("iiiiiiiiiii", $id, $data['tournament_id'], $data['player1Id'], $data['player2Id'], $data['score1'], $data['score2'], $data['completed'], $data['firstServer'], $data['servingPlayer'], $data['match_order'], $data['sidesSwapped']);
-        $stmtInsert->execute();
+        $stmtInsert->bind_param("iiiiiiiiiii", $id, $data['tournament_id'], $data['player1Id'], $data['player2Id'], $data['score1'], $data['score2'], $data['completed'], $dataFirstServer, $dataServingPlayer, $data['match_order'], $dataSidesSwapped);
+        if (!$stmtInsert->execute()) {
+            error_log("handleUpdateMatch: Chyba při vkládání nové verze zápasu: " . $stmtInsert->error);
+            throw new Exception("Chyba při aktualizaci zápasu: " . $stmtInsert->error);
+        }
     }
 }
 
