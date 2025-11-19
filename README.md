@@ -145,6 +145,30 @@ Pro rychlejší ovládání hry jsou k dispozici klávesové zkratky:
 
 **Poznámka:** Zkratky fungují pouze během aktivní hry, když není otevřený žádný modal nebo input field.
 
+### Export dat
+
+Aplikace umožňuje exportovat statistiky turnaje do různých formátů:
+
+- **Kde najdete:** Tlačítka "Export CSV" a "Export PDF" v obrazovce statistik turnaje
+
+- **CSV export obsahuje:**
+  - Informace o turnaji (název, datum vytvoření, body k výhře)
+  - Výsledkovou listinu (pozice, jméno, vítězství, porážky, odehráno, úspěšnost)
+  - Matici vzájemných zápasů
+  - Seznam všech zápasů s výsledky
+
+- **PDF export obsahuje:**
+  - Informace o turnaji
+  - Výsledkovou listinu (formátovanou tabulku)
+  - Matici vzájemných zápasů s barevným rozlišením výher a proher
+  - Automatické stránkování pro větší turnaje
+  - Správné zobrazení českých znaků
+
+**Technické detaily:**
+- CSV export používá UTF-8 s BOM pro správné zobrazení českých znaků
+- PDF export používá html2canvas a jsPDF pro renderování HTML do PDF
+- Soubory se stahují s názvem obsahujícím název turnaje a datum
+
 ## 🔌 API
 
 ### Endpoint

@@ -355,6 +355,32 @@ if (sidesSwapped) {
 }
 ```
 
+### Export dat
+
+**Implementace:** `index.html`, funkce `exportToCSV()` a `exportToPDF()`
+
+**CSV Export:**
+- Používá `Blob` API pro vytvoření souboru
+- UTF-8 s BOM (`\ufeff`) pro správné zobrazení českých znaků
+- Oddělovače sekcí používají `---` místo `===` (aby Google Tabulky neinterpretovaly jako vzorce)
+- Obsahuje: informace o turnaji, výsledkovou listinu, matici vzájemných zápasů, seznam zápasů
+
+**PDF Export:**
+- Používá `html2canvas` pro renderování HTML do canvasu
+- Používá `jsPDF` pro vytvoření PDF z obrázku
+- Element je vytvořen mimo obrazovku (`position: absolute`, `top: -9999px`)
+- Automatické stránkování pro delší obsahy
+- Správné zobrazení českých znaků díky renderování HTML jako obrázku
+
+**Frontend akce:**
+- `export-csv` - volá `exportToCSV()`
+- `export-pdf` - volá `exportToPDF()`
+
+**Důležité:**
+- Element pro PDF musí být přidán do DOM před renderováním
+- Používá se `setTimeout` pro zajištění načtení elementu
+- html2canvas vyžaduje viditelný element (i když mimo obrazovku)
+
 ## 🔑 Klíčové konvence
 
 ### Temporal Versioning
@@ -473,7 +499,7 @@ grep -r "case '" api.php
 - `ping3.sql` - Kompletní databázové schéma
 - `config/config.php` - Konfigurace a načítání .env
 - `.env.example` - Šablona pro environment proměnné
-- `zadání.txt` - Původní požadavky projektu (v češtině)
+- `STATUS_IMPLEMENTACE.md` - Přehled implementovaných funkcí
 
 ## ⚠️ Důležité upozornění
 
