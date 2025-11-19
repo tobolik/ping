@@ -2,7 +2,8 @@
 SQLyog Ultimate v12.09 (64 bit)
 MySQL - 10.11.14-MariaDB-0+deb12u2-log : Database - sensiocz02
 *********************************************************************
-*/
+*/
+
 
 /*!40101 SET NAMES utf8 */;
 
@@ -31,6 +32,7 @@ CREATE TABLE `matches` (
   `completed` tinyint(1) DEFAULT 0,
   `first_server` int(11) DEFAULT NULL,
   `serving_player` int(11) DEFAULT NULL,
+  `sides_swapped` tinyint(1) DEFAULT 0,
   `match_order` int(11) NOT NULL,
   `valid_from` datetime NOT NULL DEFAULT current_timestamp(),
   `valid_to` datetime DEFAULT NULL,
@@ -44,7 +46,7 @@ CREATE TABLE `matches` (
 
 /*Data for the table `matches` */
 
-insert  into `matches`(`id`,`entity_id`,`tournament_id`,`player1_id`,`player2_id`,`score1`,`score2`,`completed`,`first_server`,`serving_player`,`match_order`,`valid_from`,`valid_to`) values (1,1,1,1,3,11,6,1,1,1,0,'2025-10-03 13:05:25',NULL),(2,2,1,5,3,11,4,1,1,2,1,'2025-10-03 13:05:25',NULL),(3,3,1,3,4,11,8,1,2,1,2,'2025-10-03 13:05:25',NULL),(4,4,1,5,4,11,6,1,1,1,3,'2025-10-03 13:05:25',NULL),(5,5,1,1,5,11,9,1,1,1,4,'2025-10-03 13:05:25',NULL),(6,6,1,1,4,11,5,1,2,2,5,'2025-10-03 13:05:25',NULL),(7,7,2,1,3,9,11,1,1,1,0,'2025-10-03 13:05:25',NULL),(8,8,2,5,3,11,5,1,1,1,1,'2025-10-03 13:05:25',NULL),(9,9,2,1,5,8,11,1,2,1,2,'2025-10-03 13:05:25',NULL),(10,10,2,1,4,11,1,1,2,2,3,'2025-10-03 13:05:25',NULL),(11,11,2,5,4,11,9,1,1,1,4,'2025-10-03 13:05:25',NULL),(12,12,2,4,3,7,11,1,2,1,5,'2025-10-03 13:05:25',NULL),(13,13,3,1,5,0,0,0,NULL,NULL,0,'2025-10-03 13:05:51',NULL),(14,14,3,5,2,0,0,0,NULL,NULL,0,'2025-10-03 13:05:51',NULL),(15,15,3,1,2,0,0,0,NULL,NULL,0,'2025-10-03 13:05:51',NULL),(16,13,3,1,5,0,0,0,1,1,0,'2025-10-03 13:05:54',NULL);
+insert  into `matches`(`id`,`entity_id`,`tournament_id`,`player1_id`,`player2_id`,`score1`,`score2`,`completed`,`first_server`,`serving_player`,`sides_swapped`,`match_order`,`valid_from`,`valid_to`) values (1,1,1,1,3,11,6,1,1,1,0,0,'2025-10-03 13:05:25',NULL),(2,2,1,5,3,11,4,1,1,2,0,1,'2025-10-03 13:05:25',NULL),(3,3,1,3,4,11,8,1,2,1,0,2,'2025-10-03 13:05:25',NULL),(4,4,1,5,4,11,6,1,1,1,0,3,'2025-10-03 13:05:25',NULL),(5,5,1,1,5,11,9,1,1,1,0,4,'2025-10-03 13:05:25',NULL),(6,6,1,1,4,11,5,1,2,2,0,5,'2025-10-03 13:05:25',NULL),(7,7,2,1,3,9,11,1,1,1,0,0,'2025-10-03 13:05:25',NULL),(8,8,2,5,3,11,5,1,1,1,0,1,'2025-10-03 13:05:25',NULL),(9,9,2,1,5,8,11,1,2,1,0,2,'2025-10-03 13:05:25',NULL),(10,10,2,1,4,11,1,1,2,2,0,3,'2025-10-03 13:05:25',NULL),(11,11,2,5,4,11,9,1,1,1,0,4,'2025-10-03 13:05:25',NULL),(12,12,2,4,3,7,11,1,2,1,0,5,'2025-10-03 13:05:25',NULL),(13,13,3,1,5,0,0,0,NULL,NULL,0,0,'2025-10-03 13:05:51',NULL),(14,14,3,5,2,0,0,0,NULL,NULL,0,0,'2025-10-03 13:05:51',NULL),(15,15,3,1,2,0,0,0,NULL,NULL,0,0,'2025-10-03 13:05:51',NULL),(16,13,3,1,5,0,0,0,1,1,0,0,'2025-10-03 13:05:54',NULL);
 
 /*Table structure for table `players` */
 
@@ -61,7 +63,7 @@ CREATE TABLE `players` (
   `valid_from` datetime NOT NULL DEFAULT current_timestamp(),
   `valid_to` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `idx_name` (`name`),
+  KEY `idx_name` (`name`(191)),
   KEY `idx_players_entity_id` (`entity_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

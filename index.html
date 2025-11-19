@@ -70,8 +70,50 @@
         #sound-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
         
         @media (max-width: 768px) {
-            body.game-active, body.game-active #app { padding: 0; margin: 0; max-width: 100vw; height: 100vh; overflow: hidden; }
-            body.game-active #game-screen { height: 100%; }
+            html:has(body.game-active) {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                overflow: hidden !important;
+            }
+            body.game-active { 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                overflow: hidden !important;
+                width: 100vw !important;
+                height: 100vh !important;
+            }
+            body.game-active #app { 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                max-width: none !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                overflow: hidden !important;
+            }
+            body.game-active #game-screen { 
+                height: 100vh !important; 
+                width: 100vw !important;
+                max-width: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+            }
+            body.game-active #game-screen > div {
+                width: 100% !important;
+                height: 100vh !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                max-width: none !important;
+            }
+            body.game-active #game-screen .player-score-box {
+                min-height: 0 !important;
+            }
         }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -261,11 +303,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const getTournament = (id = state.activeTournamentId) => state.tournaments.find(t => t.id === id);
     const getMatch = (tournament, matchId) => tournament.matches.find(m => m.id == matchId);
     const formatDate = (iso) => new Date(iso).toLocaleDateString('cs-CZ');
-    const showScreen = (screenName) => { document.body.classList.remove('game-active'); Object.values(screens).forEach(s => s.classList.remove('active')); if(screens[screenName]) screens[screenName].classList.add('active'); window.scrollTo(0,0); };
+    const showScreen = (screenName) => { 
+        const isGameScreen = screenName === 'game';
+        if (!isGameScreen) {
+            document.body.classList.remove('game-active');
+            app.classList.add('max-w-xl', 'mx-auto', 'p-4');
+        }
+        Object.values(screens).forEach(s => s.classList.remove('active')); 
+        if(screens[screenName]) screens[screenName].classList.add('active'); 
+        window.scrollTo(0,0); 
+    };
     const openModal = (html) => { modalsContainer.innerHTML = html; };
     const closeModal = () => { modalsContainer.innerHTML = ''; };
     const getCzechPlayerDeclension = (count) => { if (count === 1) return 'hráč'; if (count >= 2 && count <= 4) return 'hráči'; return 'hráčů'; };
-    const renderGameScreen = (content) => { document.body.classList.add('game-active'); screens.game.innerHTML = content; showScreen('game'); };
+    const renderGameScreen = (content) => { 
+        document.body.classList.add('game-active');
+        app.classList.remove('max-w-xl', 'mx-auto', 'p-4');
+        screens.game.innerHTML = content; 
+        showScreen('game'); 
+    };
     
     const templates = {
         leaderboardTable: (stats, t) => `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">Poz.</th><th class="p-2">Hráč</th><th class="p-2 text-center">Vítězství</th><th class="p-2 text-center">Porážky</th><th class="p-2 text-center">Odehráno</th><th class="p-2 text-center">Úspěšnost</th></tr></thead><tbody>${stats.map((s, i) => `<tr class="border-b last:border-none"><td class="p-2 font-bold">${i === 0 && s.wins > 0 ? '🏆' : `#${i+1}`}</td><td class="p-2 flex items-center gap-2"><div class="w-4 h-4 rounded-full ${playerColors[t.playerIds.indexOf(s.player.id) % playerColors.length]}"></div> ${s.player.name}</td><td class="p-2 text-center font-bold text-green-600">${s.wins}</td><td class="p-2 text-center text-red-500">${s.losses}</td><td class="p-2 text-center">${s.played}</td><td class="p-2 text-center font-semibold">${s.played > 0 ? Math.round((s.wins / s.played) * 100) : 0}%</td></tr>`).join('')}</tbody></table></div>`
@@ -929,32 +985,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const servingPlayerName = m.servingPlayer ? getGlobalPlayer(m.servingPlayer).name : '...';
 
         renderGameScreen(`
-            <div class="h-full flex flex-col">
-                <header class="bg-white/90 backdrop-blur-sm p-3 shadow-sm text-center flex justify-between items-center w-full z-10 flex-shrink-0">
-                    <button data-action="back-to-tournament" class="btn btn-secondary !p-2 w-24">Přerušit</button>
-                    <div class="flex-grow">
-                        <p class="text-sm text-gray-500">Hraje se na ${t.pointsToWin} bodů</p>
-                        <p class="font-semibold">Podání: ${servingPlayerName}</p>
+            <div class="h-screen flex flex-col w-full">
+                <header class="bg-white/90 backdrop-blur-sm p-2 md:p-3 shadow-sm text-center flex justify-between items-center w-full z-10 flex-shrink-0">
+                    <button data-action="back-to-tournament" class="btn btn-secondary !p-1 md:!p-2 text-sm md:text-base w-20 md:w-24">Přerušit</button>
+                    <div class="flex-grow px-2">
+                        <p class="text-xs md:text-sm text-gray-500">Hraje se na ${t.pointsToWin} bodů</p>
+                        <p class="text-sm md:text-base font-semibold">Podání: ${servingPlayerName}</p>
                     </div>
-                    <div class="w-24 flex justify-end gap-2">
-                        <button data-action="toggle-voice-assist-ingame" class="btn btn-secondary !p-0 h-10 w-10 text-lg" title="Zapnout/vypnout hlas">${state.settings.voiceAssistEnabled ? '<i class="fa-solid fa-comment-dots"></i>' : '<i class="fa-solid fa-comment-slash"></i>'}</button>
-                        <button data-action="toggle-sound-ingame" class="btn btn-secondary !p-0 h-10 w-10 text-lg" title="Zapnout/vypnout zvuky">${state.settings.soundsEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>'}</button>
+                    <div class="w-20 md:w-24 flex justify-end gap-1 md:gap-2">
+                        <button data-action="toggle-voice-assist-ingame" class="btn btn-secondary !p-0 h-8 w-8 md:h-10 md:w-10 text-base md:text-lg" title="Zapnout/vypnout hlas">${state.settings.voiceAssistEnabled ? '<i class="fa-solid fa-comment-dots"></i>' : '<i class="fa-solid fa-comment-slash"></i>'}</button>
+                        <button data-action="toggle-sound-ingame" class="btn btn-secondary !p-0 h-8 w-8 md:h-10 md:w-10 text-base md:text-lg" title="Zapnout/vypnout zvuky">${state.settings.soundsEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>'}</button>
                     </div>
                 </header>
-                <div class="flex-grow flex flex-col md:flex-row">
-                    <div ${canAddPoints ? `data-action="add-point" data-player-id="${p1.id}"` : ''} class="player-score-box bg-red-500 p-4 text-white relative flex flex-col items-center justify-center flex-grow ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
-                        ${m.servingPlayer === p1.id ? `<div class="absolute top-4 left-4 w-10 h-10 rounded-full bg-yellow-400/90 text-2xl flex items-center justify-center">🏓</div>` : ''}
-                        <button data-action="subtract-point" data-player-id="${p1.id}" class="absolute top-4 right-4 w-12 h-12 bg-black/20 rounded-full text-2xl">-1</button>
-                        <div class="text-2xl md:text-3xl font-bold">${p1.name}</div>
-                        <div class="text-8xl md:text-9xl font-extrabold my-4">${s1}</div>
-                        <div class="text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div>
+                <div class="flex-1 flex flex-row w-full min-h-0">
+                    <div ${canAddPoints ? `data-action="add-point" data-player-id="${p1.id}"` : ''} class="player-score-box bg-red-500 p-2 md:p-4 text-white relative flex flex-col items-center justify-center flex-1 w-1/2 h-full ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
+                        ${m.servingPlayer === p1.id ? `<div class="absolute top-2 left-2 md:top-4 md:left-4 w-8 h-8 md:w-10 md:h-10 rounded-full bg-yellow-400/90 text-xl md:text-2xl flex items-center justify-center">🏓</div>` : ''}
+                        <button data-action="subtract-point" data-player-id="${p1.id}" class="absolute top-2 right-2 md:top-4 md:right-4 w-10 h-10 md:w-12 md:h-12 bg-black/20 rounded-full text-xl md:text-2xl">-1</button>
+                        <div class="text-xl md:text-2xl lg:text-3xl font-bold">${p1.name}</div>
+                        <div class="text-7xl md:text-8xl lg:text-9xl font-extrabold my-2 md:my-4">${s1}</div>
+                        <div class="text-xs md:text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div>
                     </div>
-                    <div ${canAddPoints ? `data-action="add-point" data-player-id="${p2.id}"` : ''} class="player-score-box bg-green-500 p-4 text-white relative flex flex-col items-center justify-center flex-grow ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
-                        ${m.servingPlayer === p2.id ? `<div class="absolute top-4 left-4 w-10 h-10 rounded-full bg-yellow-400/90 text-2xl flex items-center justify-center">🏓</div>` : ''}
-                        <button data-action="subtract-point" data-player-id="${p2.id}" class="absolute top-4 right-4 w-12 h-12 bg-black/20 rounded-full text-2xl">-1</button>
-                        <div class="text-2xl md:text-3xl font-bold">${p2.name}</div>
-                        <div class="text-8xl md:text-9xl font-extrabold my-4">${s2}</div>
-                        <div class="text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div>
+                    <div ${canAddPoints ? `data-action="add-point" data-player-id="${p2.id}"` : ''} class="player-score-box bg-green-500 p-2 md:p-4 text-white relative flex flex-col items-center justify-center flex-1 w-1/2 h-full ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
+                        ${m.servingPlayer === p2.id ? `<div class="absolute top-2 left-2 md:top-4 md:left-4 w-8 h-8 md:w-10 md:h-10 rounded-full bg-yellow-400/90 text-xl md:text-2xl flex items-center justify-center">🏓</div>` : ''}
+                        <button data-action="subtract-point" data-player-id="${p2.id}" class="absolute top-2 right-2 md:top-4 md:right-4 w-10 h-10 md:w-12 md:h-12 bg-black/20 rounded-full text-xl md:text-2xl">-1</button>
+                        <div class="text-xl md:text-2xl lg:text-3xl font-bold">${p2.name}</div>
+                        <div class="text-7xl md:text-8xl lg:text-9xl font-extrabold my-2 md:my-4">${s2}</div>
+                        <div class="text-xs md:text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div>
                     </div>
                 </div>
                 ${winnerId ? `<div class="absolute bottom-4 left-4 right-4 bg-white p-6 rounded-xl shadow-lg text-center space-y-3 z-20"><div class="text-3xl">🏆</div><h2 class="text-2xl font-bold">Vítěz: ${getGlobalPlayer(winnerId).name}!</h2><p class="text-gray-500">Výsledek: ${m.score1} : ${m.score2}</p><button data-action="save-match-result" class="btn btn-primary w-full">Uložit výsledek</button></div>` : ''}

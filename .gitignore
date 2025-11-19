@@ -1,5 +1,9 @@
 # Sensitive configuration files
 api/config.php
+config/config.php
+.env.localhost
+.env.production
+.env
 
 # IDE specific files
 .idea/
