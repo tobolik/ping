@@ -70,6 +70,10 @@
         }
         #sound-toggle:checked ~ .toggle-checkbox { background-color: #22c55e; }
         #sound-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
+        #voice-assist-toggle:checked ~ .toggle-checkbox { background-color: #22c55e; }
+        #voice-assist-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
+        #show-locked-toggle:checked ~ .toggle-checkbox { background-color: #22c55e; }
+        #show-locked-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
         
         @media (max-width: 768px) {
             html:has(body.game-active) {
@@ -152,6 +156,13 @@
                                     <div class="absolute left-0 top-0 w-5 h-5 bg-white rounded-full shadow transform transition-transform toggle-label"></div>
                                 </div>
                             </label>
+                            <label for="show-locked-toggle" class="cursor-pointer flex items-center justify-between">
+                                <span class="flex items-center"><i class="fa-solid fa-lock w-6 mr-2"></i>Zobrazit zamčené turnaje</span>
+                                <input type="checkbox" id="show-locked-toggle" data-action="toggle-show-locked" class="sr-only">
+                                <div class="relative w-10 h-5 bg-gray-300 rounded-full transition-colors toggle-checkbox">
+                                    <div class="absolute left-0 top-0 w-5 h-5 bg-white rounded-full shadow transform transition-transform toggle-label"></div>
+                                </div>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -215,7 +226,12 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     const updateStateWithApiData = (data) => {
-        state.settings = data.settings || { soundsEnabled: true, voiceAssistEnabled: false };
+        state.settings = {
+            soundsEnabled: true,
+            voiceAssistEnabled: false,
+            showLockedTournaments: false,
+            ...(data.settings || {})
+        };
         state.playerDatabase = data.playerDatabase.map(p => ({
             id: parseInt(p.id, 10),
             name: p.name,
@@ -424,10 +440,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const renderMainScreen = () => {
         const container = document.getElementById('tournaments-list-container');
-        if (state.tournaments.length === 0) {
+        // Filtrujeme turnaje podle nastavení zobrazení zamčených turnajů
+        const showLocked = state.settings.showLockedTournaments || false;
+        const visibleTournaments = showLocked ? state.tournaments : state.tournaments.filter(t => !t.isLocked);
+        
+        if (visibleTournaments.length === 0) {
             container.innerHTML = `<div class="text-center py-10 px-6 bg-white rounded-xl shadow-sm"><i class="fa-solid fa-trophy text-5xl text-gray-300"></i><h2 class="text-xl font-semibold text-gray-700 mt-4">Žádné turnaje</h2><p class="text-gray-500 mt-1">Vytvořte svůj první ping pongový turnaj</p><button data-action="show-new-tournament-modal" class="btn btn-primary mt-4">Vytvořit turnaj</button></div>`;
         } else {
-            container.innerHTML = state.tournaments.sort((a,b) => b.id - a.id).map(t => {
+            container.innerHTML = visibleTournaments.sort((a,b) => b.id - a.id).map(t => {
                 const completedCount = t.matches.filter(m => m.completed).length; const totalMatches = t.matches.length;
                 const isFinished = totalMatches > 0 && completedCount === totalMatches;
                 let winnerInfo = '';
@@ -1098,6 +1118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!menu.classList.contains('hidden')) { 
                 document.getElementById('sound-toggle').checked = state.settings.soundsEnabled; 
                 document.getElementById('voice-assist-toggle').checked = state.settings.voiceAssistEnabled;
+                document.getElementById('show-locked-toggle').checked = state.settings.showLockedTournaments || false;
             } 
         },
         'toggle-sound-ingame': () => { 
@@ -1173,6 +1194,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Krátká prodleva, aby se případně stihlo zavřít menu
                 setTimeout(() => speak("Hlasový asistent zapnut."), 100);
             }
+        }
+        const showLockedToggle = e.target.closest('[data-action="toggle-show-locked"]');
+        if (showLockedToggle) {
+            state.settings.showLockedTournaments = showLockedToggle.checked;
+            apiCall('saveSettings', { key: 'showLockedTournaments', value: state.settings.showLockedTournaments });
+            renderMainScreen();
         }
     });
     document.getElementById('import-file').addEventListener('change', (event) => {
