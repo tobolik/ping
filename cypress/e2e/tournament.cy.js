@@ -7,7 +7,7 @@ describe('Základní testy aplikace', () => {
   });
 
   it('úspěšně načte hlavní stránku a zobrazí nadpis', () => {
-    cy.contains('h1', 'Ping Pong Turnaje').should('be.visible');
+    cy.contains('h1', 'Ping pong turnaje').should('be.visible');
   });
 
   it('dokáže vytvořit nový turnaj a zobrazí ho na hlavní obrazovce', () => {

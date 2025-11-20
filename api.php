@@ -189,7 +189,7 @@ function handleCreateTournament($conn, $payload) {
         throw new Exception("Chyba při přípravě dotazu pro hráče turnaje: " . $conn->error);
     }
     foreach ($payload['playerIds'] as $order => $playerId) {
-        $playerStmt->bind_param("iiii", $nextTpEntityId, $tournamentId, $playerId, $order);
+        $playerStmt->bind_param("iiii", $nextTpEntityId, $tournamentEntityId, $playerId, $order);
         if (!$playerStmt->execute()) {
             throw new Exception("Chyba při vkládání hráče do turnaje: " . $playerStmt->error);
         }
@@ -205,7 +205,7 @@ function handleCreateTournament($conn, $payload) {
     $order = 0;
     for ($i = 0; $i < count($playerIds); $i++) {
         for ($j = $i + 1; $j < count($playerIds); $j++) {
-            $matchStmt->bind_param("iiiii", $nextMatchEntityId, $tournamentId, $playerIds[$i], $playerIds[$j], $order);
+            $matchStmt->bind_param("iiiii", $nextMatchEntityId, $tournamentEntityId, $playerIds[$i], $playerIds[$j], $order);
             if (!$matchStmt->execute()) {
                 throw new Exception("Chyba při vkládání zápasu: " . $matchStmt->error);
             }
