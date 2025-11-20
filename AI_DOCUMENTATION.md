@@ -193,6 +193,11 @@ last_sync (TIMESTAMP)
 - Vytvoří vazby v `tournament_players`
 - Vygeneruje všechny možné zápasy (každý s každým)
 
+**Frontend implementace:**
+- Akce `create-tournament` automaticky kontroluje unikátnost názvu pomocí `generateUniqueTournamentName()`
+- Pokud název už existuje, automaticky se přidá číslo v závorce
+- Formát data: `YYYY-MM-DD HH:MM:SS` (MySQL formát, ne ISO 8601)
+
 #### Akce: `updateTournament`
 
 **Payload:**
@@ -315,6 +320,8 @@ last_sync (TIMESTAMP)
 **Důležité:**
 - Používá `$conn->insert_id` v PHP pro získání skutečného ID nového turnaje
 - Formát data pro MySQL: `YYYY-MM-DD HH:MM:SS` (ne ISO 8601)
+- **Inteligentní názvy:** Pokud turnaj obsahuje dnešní datum, použije se stávající logika s číslem. Pokud obsahuje starší datum, použije se dnešní datum v názvu
+- Používá funkci `generateUniqueTournamentName()` pro generování unikátního názvu
 
 ### Vrácení posledního bodu (Undo)
 
@@ -335,16 +342,38 @@ state.scoreHistory = []  // Pole objektů s historií stavů
 
 **Implementace:** `index.html`, event listener na `document.keydown`
 
-**Podporované zkratky:**
+**Kompletní workflow zkratky:**
+
+#### Během aktivní hry
 - `ArrowLeft` - Přidá bod levému hráči (respektuje `sidesSwapped`)
 - `ArrowRight` - Přidá bod pravému hráči (respektuje `sidesSwapped`)
 
-**Podmínky aktivace:**
-- Hra musí být aktivní (`#game-screen` je viditelný)
-- Žádný modal nesmí být otevřený
-- Žádný input field nesmí být ve focusu
+#### Po vítězství zápasu
+- `ArrowLeft` - Vrátí poslední bod (Undo) - klikne na `[data-action="undo-last-point"]`
+- `ArrowRight` - Uloží výsledek - klikne na `[data-action="save-match-result"]`
 
-**Logika:**
+#### V modalu "Kdo má první podání"
+- `ArrowLeft` - Vybere levého hráče - klikne na první `[data-action="set-first-server"]`
+- `ArrowRight` - Vybere pravého hráče - klikne na druhý `[data-action="set-first-server"]`
+
+#### V průběžném pořadí
+- `ArrowRight` - Pokračuje v turnaji - klikne na `[data-action="close-and-refresh"]`
+
+#### V konečných výsledcích
+- `ArrowLeft` - Zavře modal - klikne na `[data-action="close-and-home"]`
+- `ArrowRight` - Kopíruje turnaj - klikne na `[data-action="copy-tournament"]`
+
+#### V nadcházejících zápasech (tournament screen)
+- `ArrowRight` - Spustí první zápas - klikne na první `[data-action="play-match"]:not([disabled])`
+
+#### Na hlavní obrazovce
+- `ArrowRight` - Spustí první turnaj s "Start turnaje" - klikne na první `[data-action="open-tournament"]` obsahující text "Start turnaje"
+
+**Podmínky aktivace:**
+- Žádný input field nesmí být ve focusu (`INPUT`, `TEXTAREA`, `contentEditable`)
+- Zkratky se aktivují podle aktuální obrazovky a stavu modalu
+
+**Logika pro hru:**
 ```javascript
 if (sidesSwapped) {
   ArrowLeft -> right player
@@ -354,6 +383,13 @@ if (sidesSwapped) {
   ArrowRight -> right player
 }
 ```
+
+**Priorita zpracování:**
+1. Escape pro zavření modalu
+2. Aktivní hra (přidávání bodů nebo vítězství)
+3. Modaly (podle typu modalu)
+4. Tournament screen
+5. Main screen
 
 ### Export dat
 
@@ -458,6 +494,52 @@ const mysqlDate = now.getFullYear() + '-' +
 2. Zkontroluj, že `handleUpdateMatch` správně zpracovává NULL hodnoty
 3. Ověř, že `sidesSwapped` je správně převedeno na integer (0/1)
 
+## 🎨 Frontend funkcionality
+
+### Generování unikátních názvů turnajů
+
+**Funkce:** `generateUniqueTournamentName(baseName, excludeTournamentId = null)`
+
+**Implementace:** `index.html`
+
+**Chování:**
+- Vezme základní název a odstraní případné číslo v závorce
+- Zkontroluje, jestli název už existuje (s možností vyloučit konkrétní turnaj)
+- Pokud existuje, přidá číslo v závorce a zvyšuje ho, dokud nenajde volný název
+
+**Použití:**
+- V `create-tournament` - automaticky upraví název, pokud už existuje
+- V `copy-tournament` - používá stejnou logiku (s podporou pro datum)
+
+**Příklad:**
+```javascript
+const uniqueName = generateUniqueTournamentName("Turnaj");
+// Pokud "Turnaj" existuje, vrátí "Turnaj (2)", "Turnaj (3)", atd.
+```
+
+### Konzistentní barvy hráčů
+
+**Implementace:** `index.html`, pole `playerColors`
+
+**Chování:**
+- Každý hráč má přiřazenou barvu podle svého pořadí v turnaji (`t.playerIds.indexOf(playerId)`)
+- Barvy se určují pomocí: `playerColors[t.playerIds.indexOf(playerId) % playerColors.length]`
+- Barvy jsou konzistentní napříč:
+  - Nadcházející zápasy
+  - Modal "Kdo má první podání"
+  - Během zápasu (player-score-box)
+  - Statistiky a výsledkové listiny
+
+**Pole barev:**
+```javascript
+const playerColors = ["bg-red-500", "bg-blue-500", "bg-green-500", "bg-purple-500", 
+                      "bg-yellow-500", "bg-pink-500", "bg-indigo-500", "bg-teal-500"];
+```
+
+**Důležité:**
+- Barvy se určují podle pořadí v `t.playerIds`, ne podle pozice v zápase
+- Respektuje se `sidesSwapped` pro zobrazení, ale barva zůstává stejná
+
 ## 📝 Poznámky pro vývoj
 
 ### Přidávání nových funkcí
@@ -465,6 +547,7 @@ const mysqlDate = now.getFullYear() + '-' +
 1. **Backend:** Přidej novou akci do `api.php` switch statement
 2. **Frontend:** Přidej volání API v `index.html`
 3. **Databáze:** Pokud potřebuješ nové sloupce, vytvoř migrační skript
+4. **Názvy turnajů:** Používej `generateUniqueTournamentName()` pro zajištění unikátnosti
 
 ### Testování
 
@@ -510,4 +593,7 @@ grep -r "case '" api.php
 5. **Formát data pro MySQL:** Používej `YYYY-MM-DD HH:MM:SS`, ne ISO 8601 (`toISOString()`)
 6. **NULL hodnoty v `handleUpdateMatch`:** Vždy normalizuj NULL hodnoty před porovnáním
 7. **`insert_id` v PHP:** Po `INSERT` vždy použij `$conn->insert_id` pro získání skutečného ID, ne `entity_id`
+8. **Unikátní názvy turnajů:** Při vytváření turnaje vždy použij `generateUniqueTournamentName()` pro zajištění unikátnosti
+9. **Barvy hráčů:** Vždy používej `playerColors[t.playerIds.indexOf(playerId) % playerColors.length]` pro konzistentní barvy
+10. **Klávesové zkratky:** Při přidávání nových zkratek zkontroluj, že nejsou v konfliktu s existujícími a že respektují podmínky aktivace
 

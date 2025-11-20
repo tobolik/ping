@@ -303,6 +303,33 @@ document.addEventListener('DOMContentLoaded', () => {
         synth.speak(utterance);
     }
     
+    // Funkce pro generování unikátního názvu turnaje
+    function generateUniqueTournamentName(baseName, excludeTournamentId = null) {
+        // Odstraníme případné číslo na konci (např. "Turnaj (2)" -> "Turnaj")
+        let cleanBaseName = baseName;
+        const nameMatch = cleanBaseName.match(/^(.+?)\s*\(\d+\)\s*$/);
+        if (nameMatch) {
+            cleanBaseName = nameMatch[1].trim();
+        }
+        
+        // Zkontrolujeme, jestli základní název už existuje
+        const existingNames = state.tournaments
+            .filter(t => excludeTournamentId === null || t.id != excludeTournamentId)
+            .map(t => t.name);
+        
+        if (!existingNames.includes(cleanBaseName)) {
+            return cleanBaseName;
+        }
+        
+        // Pokud existuje, přidáme číslo v závorce
+        let copyNumber = 2;
+        while (existingNames.includes(`${cleanBaseName} (${copyNumber})`)) {
+            copyNumber++;
+        }
+        
+        return `${cleanBaseName} (${copyNumber})`;
+    }
+    
     function initializeAudio() { if (!audioContext) { audioContext = new (window.AudioContext || window.webkitAudioContext)(); } }
 
     const getGlobalPlayer = (id) => state.playerDatabase.find(p => p.id === id);
@@ -768,10 +795,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('Zadejte název a alespoň 2 hráče.');
                 return;
             }
+            // Zkontrolujeme a upravíme název, pokud už existuje
+            const uniqueName = generateUniqueTournamentName(name);
+            // Formát data pro MySQL: YYYY-MM-DD HH:MM:SS
+            const now = new Date();
+            const mysqlDate = now.getFullYear() + '-' + 
+                String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(now.getDate()).padStart(2, '0') + ' ' + 
+                String(now.getHours()).padStart(2, '0') + ':' + 
+                String(now.getMinutes()).padStart(2, '0') + ':' + 
+                String(now.getSeconds()).padStart(2, '0');
             const payload = {
-                name,
+                name: uniqueName,
                 pointsToWin: parseInt(document.querySelector('input[name="points-to-win"]:checked').value),
-                createdAt: new Date().toISOString(),
+                createdAt: mysqlDate,
                 playerIds: tempPlayerIds
             };
             
@@ -820,26 +857,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            // Najdeme vhodný název pro kopii
-            let baseName = t.name;
-            // Odstraníme případné číslo na konci (např. "Turnaj (2)" -> "Turnaj")
-            const nameMatch = baseName.match(/^(.+?)\s*\(\d+\)\s*$/);
-            if (nameMatch) {
-                baseName = nameMatch[1].trim();
+            // Zjistíme dnešní datum ve formátu DD. MM. YYYY
+            const now = new Date();
+            const todayStr = `${now.getDate()}. ${now.getMonth() + 1}. ${now.getFullYear()}`;
+            
+            // Zkontrolujeme, jestli je v názvu turnaje dnešní datum
+            const hasTodayDate = t.name.includes(todayStr);
+            
+            let baseName;
+            if (hasTodayDate) {
+                // Pokud je v názvu dnešní datum, použijeme stávající název
+                baseName = t.name;
+            } else {
+                // Pokud v názvu není dnešní datum, použijeme dnešní datum
+                // Odstraníme datum z původního názvu (např. "Turnaj 3. 10. 2025" -> "Turnaj")
+                baseName = t.name.replace(/\d+\.\s*\d+\.\s*\d{4}/, '').trim();
+                // Odstraníme případné římské číslice na konci (např. "Turnaj II." -> "Turnaj")
+                baseName = baseName.replace(/\s+[IVX]+\.?\s*$/, '').trim();
+                // Přidáme dnešní datum
+                baseName = `${baseName} ${todayStr}`;
             }
             
-            // Najdeme nejvyšší číslo, které už existuje
-            let copyNumber = 2;
-            const existingNames = state.tournaments.map(t => t.name);
-            while (existingNames.includes(`${baseName} (${copyNumber})`)) {
-                copyNumber++;
-            }
-            
-            const newName = `${baseName} (${copyNumber})`;
+            // Použijeme funkci pro generování unikátního názvu (vyloučíme původní turnaj)
+            const newName = generateUniqueTournamentName(baseName, t.id);
             
             // Vytvoříme nový turnaj se stejnými hráči
             // Formát data pro MySQL: YYYY-MM-DD HH:MM:SS
-            const now = new Date();
             const mysqlDate = now.getFullYear() + '-' + 
                 String(now.getMonth() + 1).padStart(2, '0') + '-' + 
                 String(now.getDate()).padStart(2, '0') + ' ' + 
@@ -1006,7 +1049,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const completedCount = t.matches.filter(m => m.completed).length;
             if (completedCount === t.matches.length) {
-                openModal(`<div class="modal-backdrop"><div class="modal-content modal-lg space-y-4"><h2 class="text-2xl font-bold text-center">🏆 Konečné výsledky 🏆</h2>${templates.leaderboardTable(calculateStats(t),t)}<div class="flex gap-2"><button data-action="copy-tournament" class="btn btn-secondary flex-1">Kopírovat turnaj</button><button data-action="close-and-home" class="btn btn-primary flex-1">Zavřít</button></div></div></div>`);
+                openModal(`<div class="modal-backdrop"><div class="modal-content modal-lg space-y-4"><h2 class="text-2xl font-bold text-center">🏆 Konečné výsledky 🏆</h2>${templates.leaderboardTable(calculateStats(t),t)}<div class="flex gap-2"><button data-action="close-and-home" class="btn btn-secondary flex-1">Zavřít</button><button data-action="copy-tournament" class="btn btn-primary flex-1">Kopírovat turnaj</button></div></div></div>`);
             } else {
                 openModal(`<div id="post-match-modal" class="modal-backdrop"><div class="modal-content modal-lg space-y-4"><h2 class="text-xl font-bold text-center">Průběžné pořadí</h2>${templates.leaderboardTable(calculateStats(t),t)}<button data-action="close-and-refresh" class="btn btn-primary w-full">Pokračovat</button></div></div>`);
             }
@@ -1142,22 +1185,25 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && modalsContainer.children.length > 0) {
             closeModal();
+            return;
         }
+        
+        // Zkontrolujeme, jestli není otevřený input nebo textarea
+        const activeElement = document.activeElement;
+        const isInputActive = activeElement && (
+            activeElement.tagName === 'INPUT' || 
+            activeElement.tagName === 'TEXTAREA' ||
+            activeElement.isContentEditable
+        );
+        
+        if (isInputActive) return;
         
         // Klávesové zkratky pro přidávání bodů (pouze při aktivní hře)
         if (screens.game.classList.contains('active') && modalsContainer.children.length === 0) {
             const t = getTournament();
             const m = getMatch(t, state.activeMatchId);
             
-            // Zkontrolujeme, jestli není otevřený input nebo textarea
-            const activeElement = document.activeElement;
-            const isInputActive = activeElement && (
-                activeElement.tagName === 'INPUT' || 
-                activeElement.tagName === 'TEXTAREA' ||
-                activeElement.isContentEditable
-            );
-            
-            if (m && !m.completed && !isInputActive) {
+            if (m && !m.completed) {
                 const winnerId = checkWinCondition(m, t.pointsToWin);
                 if (!winnerId) {
                     // Aplikujeme sideswap pro zobrazení
@@ -1173,6 +1219,83 @@ document.addEventListener('DOMContentLoaded', () => {
                         e.preventDefault();
                         updateScore(p2.id, 1);
                     }
+                } else {
+                    // Po vítězství: šipka vlevo = Zpět, šipka vpravo = Uložit výsledek
+                    if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        const undoBtn = document.querySelector('[data-action="undo-last-point"]:not([disabled])');
+                        if (undoBtn) undoBtn.click();
+                    } else if (e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        const saveBtn = document.querySelector('[data-action="save-match-result"]');
+                        if (saveBtn) saveBtn.click();
+                    }
+                }
+            }
+            return;
+        }
+        
+        // Klávesové zkratky pro modaly
+        if (modalsContainer.children.length > 0) {
+            const modal = modalsContainer.lastElementChild;
+            
+            // Modal "Kdo má první podání" - šipka vlevo/vpravo pro hráče
+            const firstServerBtns = modal.querySelectorAll('[data-action="set-first-server"]');
+            if (firstServerBtns.length === 2) {
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    firstServerBtns[0].click();
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    firstServerBtns[1].click();
+                }
+                return;
+            }
+            
+            // Modal "Průběžné pořadí" - šipka vpravo pro Pokračovat
+            const continueBtn = modal.querySelector('[data-action="close-and-refresh"]');
+            if (continueBtn && e.key === 'ArrowRight') {
+                e.preventDefault();
+                continueBtn.click();
+                return;
+            }
+            
+            // Modal "Konečné výsledky" - šipka vlevo pro Zavřít, vpravo pro Kopírovat turnaj
+            const closeBtn = modal.querySelector('[data-action="close-and-home"]');
+            const copyBtn = modal.querySelector('[data-action="copy-tournament"]');
+            if (closeBtn && copyBtn) {
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    closeBtn.click();
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    copyBtn.click();
+                }
+                return;
+            }
+        }
+        
+        // Klávesové zkratky pro tournament screen
+        if (screens.tournament.classList.contains('active')) {
+            // Šipka vpravo pro první tlačítko "Hrát zápas" v nadcházejících zápasech
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                const firstPlayBtn = document.querySelector('#upcoming-matches-container [data-action="play-match"]:not([disabled])');
+                if (firstPlayBtn) {
+                    firstPlayBtn.click();
+                }
+            }
+            return;
+        }
+        
+        // Klávesové zkratky pro main screen
+        if (screens.main.classList.contains('active')) {
+            // Šipka vpravo pro první tlačítko "Start turnaje"
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                const firstStartBtn = document.querySelector('#tournaments-list-container [data-action="open-tournament"]');
+                if (firstStartBtn && firstStartBtn.textContent.includes('Start turnaje')) {
+                    firstStartBtn.click();
                 }
             }
         }
@@ -1195,6 +1318,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const canAddPoints = !winnerId;
 
         const servingPlayerName = m.servingPlayer ? getGlobalPlayer(m.servingPlayer).name : '...';
+        
+        // Použijeme barvy podle pořadí hráče v turnaji
+        const p1Color = playerColors[t.playerIds.indexOf(p1.id) % playerColors.length];
+        const p2Color = playerColors[t.playerIds.indexOf(p2.id) % playerColors.length];
 
         renderGameScreen(`
             <div class="h-screen flex flex-col w-full">
@@ -1210,14 +1337,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </header>
                 <div class="flex-1 flex flex-row w-full min-h-0">
-                    <div ${canAddPoints ? `data-action="add-point" data-player-id="${p1.id}"` : ''} class="player-score-box bg-red-500 p-2 md:p-4 text-white relative flex flex-col items-center justify-center flex-1 w-1/2 h-full ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
+                    <div ${canAddPoints ? `data-action="add-point" data-player-id="${p1.id}"` : ''} class="player-score-box ${p1Color} p-2 md:p-4 text-white relative flex flex-col items-center justify-center flex-1 w-1/2 h-full ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
                         ${m.servingPlayer === p1.id ? `<div class="absolute top-2 left-2 md:top-4 md:left-4 w-8 h-8 md:w-10 md:h-10 rounded-full bg-yellow-400/90 text-xl md:text-2xl flex items-center justify-center">🏓</div>` : ''}
                         <button data-action="subtract-point" data-player-id="${p1.id}" class="absolute top-2 right-2 md:top-4 md:right-4 w-10 h-10 md:w-12 md:h-12 bg-black/20 rounded-full text-xl md:text-2xl">-1</button>
                         <div class="text-xl md:text-2xl lg:text-3xl font-bold">${p1.name}</div>
                         <div class="text-7xl md:text-8xl lg:text-9xl font-extrabold my-2 md:my-4">${s1}</div>
                         <div class="text-xs md:text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div>
                     </div>
-                    <div ${canAddPoints ? `data-action="add-point" data-player-id="${p2.id}"` : ''} class="player-score-box bg-green-500 p-2 md:p-4 text-white relative flex flex-col items-center justify-center flex-1 w-1/2 h-full ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
+                    <div ${canAddPoints ? `data-action="add-point" data-player-id="${p2.id}"` : ''} class="player-score-box ${p2Color} p-2 md:p-4 text-white relative flex flex-col items-center justify-center flex-1 w-1/2 h-full ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
                         ${m.servingPlayer === p2.id ? `<div class="absolute top-2 left-2 md:top-4 md:left-4 w-8 h-8 md:w-10 md:h-10 rounded-full bg-yellow-400/90 text-xl md:text-2xl flex items-center justify-center">🏓</div>` : ''}
                         <button data-action="subtract-point" data-player-id="${p2.id}" class="absolute top-2 right-2 md:top-4 md:right-4 w-10 h-10 md:w-12 md:h-12 bg-black/20 rounded-full text-xl md:text-2xl">-1</button>
                         <div class="text-xl md:text-2xl lg:text-3xl font-bold">${p2.name}</div>
@@ -1463,22 +1590,27 @@ document.addEventListener('DOMContentLoaded', () => {
     })();
 
     const renderStartMatchModal = (m) => {
+        const t = getTournament();
         const p1 = getGlobalPlayer(m.player1Id);
         const p2 = getGlobalPlayer(m.player2Id);
 
         const displayP1 = m.sidesSwapped ? p2 : p1;
         const displayP2 = m.sidesSwapped ? p1 : p2;
+        
+        // Použijeme barvy podle pořadí hráče v turnaji
+        const p1Color = playerColors[t.playerIds.indexOf(displayP1.id) % playerColors.length];
+        const p2Color = playerColors[t.playerIds.indexOf(displayP2.id) % playerColors.length];
 
         openModal(
             `<div class="modal-backdrop">
                 <div class="modal-content bg-white p-6 rounded-xl shadow-sm space-y-6 text-center max-w-md mx-auto my-8">
                     <h1 class="text-2xl font-bold">${displayP1.name} vs ${displayP2.name}</h1>
-                    <p class="text-gray-500">Hraje se na ${getTournament().pointsToWin} bodů</p>
+                    <p class="text-gray-500">Hraje se na ${t.pointsToWin} bodů</p>
                     <div>
                         <h2 class="text-lg font-semibold mb-3">Kdo má první podání?</h2>
                         <div class="grid grid-cols-2 gap-4">
-                            <button data-action="set-first-server" data-player-id="${displayP1.id}" class="p-4 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600">${displayP1.name}</button>
-                            <button data-action="set-first-server" data-player-id="${displayP2.id}" class="p-4 rounded-lg font-bold text-white bg-green-500 hover:bg-green-600">${displayP2.name}</button>
+                            <button data-action="set-first-server" data-player-id="${displayP1.id}" class="p-4 rounded-lg font-bold text-white ${p1Color} hover:opacity-90">${displayP1.name}</button>
+                            <button data-action="set-first-server" data-player-id="${displayP2.id}" class="p-4 rounded-lg font-bold text-white ${p2Color} hover:opacity-90">${displayP2.name}</button>
                         </div>
                     </div>
                     <button data-action="close-modal" class="btn btn-secondary w-full mt-4">Zpět</button>

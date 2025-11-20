@@ -127,6 +127,7 @@ Aplikace umožňuje rychlé kopírování turnaje pro pokračování s novým tu
 - **Speciální funkce:**
   - Automatické prohození stran hráčů (hráči, kteří hráli vlevo, budou vpravo a naopak)
   - Nový turnaj je připraven k okamžitému spuštění
+  - **Inteligentní názvy:** Pokud turnaj obsahuje dnešní datum, použije se stávající logika s číslem. Pokud obsahuje starší datum, použije se dnešní datum v názvu (např. "Turnaj 20. 11. 2025")
 
 ### Vrácení posledního bodu (Undo)
 
@@ -138,12 +139,48 @@ Během hry můžete vrátit poslední přidaný bod:
 
 ### Klávesové zkratky
 
-Pro rychlejší ovládání hry jsou k dispozici klávesové zkratky:
+Aplikace podporuje kompletní workflow ovládání pomocí šipek vlevo a vpravo:
 
+#### Během hry
 - **Šipka vlevo (←):** Přidá bod levému hráči
 - **Šipka vpravo (→):** Přidá bod pravému hráči
 
-**Poznámka:** Zkratky fungují pouze během aktivní hry, když není otevřený žádný modal nebo input field.
+#### Po vítězství zápasu
+- **Šipka vlevo (←):** Vrátí poslední bod (Undo)
+- **Šipka vpravo (→):** Uloží výsledek zápasu
+
+#### V modalu "Kdo má první podání"
+- **Šipka vlevo (←):** Vybere levého hráče
+- **Šipka vpravo (→):** Vybere pravého hráče
+
+#### V průběžném pořadí
+- **Šipka vpravo (→):** Pokračuje v turnaji
+
+#### V konečných výsledcích
+- **Šipka vlevo (←):** Zavře modal
+- **Šipka vpravo (→):** Kopíruje turnaj
+
+#### V nadcházejících zápasech
+- **Šipka vpravo (→):** Spustí první zápas ze seznamu
+
+#### Na hlavní obrazovce
+- **Šipka vpravo (→):** Spustí první turnaj s tlačítkem "Start turnaje"
+
+**Poznámka:** Zkratky fungují pouze když není otevřený žádný input field nebo textarea. Všechny zkratky respektují `sidesSwapped` (prohození stran hráčů).
+
+### Automatická kontrola názvů turnajů
+
+Při vytváření nového turnaje aplikace automaticky kontroluje, zda název už neexistuje:
+- Pokud název existuje, automaticky se přidá číslo v závorce (např. "Turnaj (2)", "Turnaj (3)")
+- Tato logika je stejná jako při kopírování turnaje
+- Zajišťuje, že každý turnaj má unikátní název
+
+### Konzistentní barvy hráčů
+
+Barvy hráčů jsou konzistentní napříč celou aplikací:
+- Každý hráč má přiřazenou barvu podle svého pořadí v turnaji
+- Barvy se zachovávají v nadcházejících zápasech, modalu "Kdo má první podání" i během samotného zápasu
+- Barvy se určují podle pořadí hráče v seznamu hráčů turnaje
 
 ### Export dat
 
