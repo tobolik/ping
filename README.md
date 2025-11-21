@@ -94,9 +94,10 @@ ping/
 ### Struktura tabulek
 
 - **`players`** - Hráči (id, entity_id, name, photo_url, strengths, weaknesses, valid_from, valid_to)
-- **`tournaments`** - Turnaje (id, entity_id, name, points_to_win, is_locked, valid_from, valid_to)
+- **`tournaments`** - Turnaje (id, entity_id, name, points_to_win, **tournament_type**, is_locked, valid_from, valid_to)
 - **`tournament_players`** - Vazba hráčů na turnaje (id, entity_id, tournament_id, player_id, player_order, valid_from, valid_to)
-- **`matches`** - Zápasy (id, entity_id, tournament_id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, sides_swapped, match_order, valid_from, valid_to)
+- **`tournament_teams`** - Dvojice pro čtyřhru (id, entity_id, tournament_id, team_order, player1_id, player2_id, valid_from, valid_to)
+- **`matches`** - Zápasy (id, entity_id, tournament_id, player1_id, player2_id, **team1_id**, **team2_id**, score1, score2, completed, first_server, serving_player, **double_rotation_state**, sides_swapped, match_order, valid_from, valid_to)
 - **`settings`** - Nastavení aplikace (id, entity_id, setting_key, setting_value, valid_from, valid_to)
 - **`sync_status`** - Status synchronizace (id, table_name, last_sync)
 
@@ -128,6 +129,14 @@ Aplikace umožňuje rychlé kopírování turnaje pro pokračování s novým tu
   - Automatické prohození stran hráčů (hráči, kteří hráli vlevo, budou vpravo a naopak)
   - Nový turnaj je připraven k okamžitému spuštění
   - **Inteligentní názvy:** Pokud turnaj obsahuje dnešní datum, použije se stávající logika s číslem. Pokud obsahuje starší datum, použije se dnešní datum v názvu (např. "Turnaj 20. 11. 2025")
+
+### Čtyřhra (doubles)
+
+- **Přepínač formátu:** Při vytváření turnaje zvolíte singl/double. Čtyřhra vyžaduje 4–16 hráčů a sudý počet, UI hlídá limity.
+- **Týmy:** Dvojice vznikají podle pořadí hráčů (1+2, 3+4, …) a ukládají se do tabulky `tournament_teams`.
+- **Zápasy:** Každý zápas ví, které týmy proti sobě stojí (`team1_id`, `team2_id`). Scoreboard zobrazuje názvy týmů ve formátu „Honza + Petr“.
+- **Oficiální podání:** Po výběru počáteční strany se servis střídá A1 → B1 → A2 → B2 (bloky 2 bodů u 11, 5 bodů u 21; po 10:10/20:20 po jednom bodu). Stav rotace se ukládá do `double_rotation_state`.
+- **Statistiky:** V detailu turnaje i v celkových statistikách najdete žebříček týmů. Exporty CSV/PDF obsahují názvy týmů a správně vyhodnocují vzájemné duely i ve čtyřhře.
 
 ### Vrácení posledního bodu (Undo)
 
@@ -193,6 +202,7 @@ Aplikace umožňuje exportovat statistiky turnaje do různých formátů:
   - Výsledkovou listinu (pozice, jméno, vítězství, porážky, odehráno, úspěšnost)
   - Matici vzájemných zápasů
   - Seznam všech zápasů s výsledky
+  - U čtyřhry zobrazuje názvy týmů a správně řeší vzájemné zápasy jednotlivců podle týmů
 
 - **PDF export obsahuje:**
   - Informace o turnaji

@@ -27,11 +27,14 @@ CREATE TABLE `matches` (
   `tournament_id` int(11) NOT NULL,
   `player1_id` int(11) NOT NULL,
   `player2_id` int(11) NOT NULL,
+  `team1_id` int(11) DEFAULT NULL,
+  `team2_id` int(11) DEFAULT NULL,
   `score1` int(11) DEFAULT 0,
   `score2` int(11) DEFAULT 0,
   `completed` tinyint(1) DEFAULT 0,
   `first_server` int(11) DEFAULT NULL,
   `serving_player` int(11) DEFAULT NULL,
+  `double_rotation_state` text DEFAULT NULL,
   `sides_swapped` tinyint(1) DEFAULT 0,
   `match_order` int(11) NOT NULL,
   `valid_from` datetime NOT NULL DEFAULT current_timestamp(),
@@ -39,6 +42,8 @@ CREATE TABLE `matches` (
   PRIMARY KEY (`id`),
   KEY `player1_id` (`player1_id`),
   KEY `player2_id` (`player2_id`),
+  KEY `team1_id` (`team1_id`),
+  KEY `team2_id` (`team2_id`),
   KEY `idx_tournament` (`tournament_id`),
   KEY `idx_completed` (`completed`),
   KEY `idx_matches_entity_id` (`entity_id`)
@@ -46,7 +51,25 @@ CREATE TABLE `matches` (
 
 /*Data for the table `matches` */
 
-insert  into `matches`(`id`,`entity_id`,`tournament_id`,`player1_id`,`player2_id`,`score1`,`score2`,`completed`,`first_server`,`serving_player`,`sides_swapped`,`match_order`,`valid_from`,`valid_to`) values (1,1,1,1,3,11,6,1,1,1,0,0,'2025-10-03 13:05:25',NULL),(2,2,1,5,3,11,4,1,1,2,0,1,'2025-10-03 13:05:25',NULL),(3,3,1,3,4,11,8,1,2,1,0,2,'2025-10-03 13:05:25',NULL),(4,4,1,5,4,11,6,1,1,1,0,3,'2025-10-03 13:05:25',NULL),(5,5,1,1,5,11,9,1,1,1,0,4,'2025-10-03 13:05:25',NULL),(6,6,1,1,4,11,5,1,2,2,0,5,'2025-10-03 13:05:25',NULL),(7,7,2,1,3,9,11,1,1,1,0,0,'2025-10-03 13:05:25',NULL),(8,8,2,5,3,11,5,1,1,1,0,1,'2025-10-03 13:05:25',NULL),(9,9,2,1,5,8,11,1,2,1,0,2,'2025-10-03 13:05:25',NULL),(10,10,2,1,4,11,1,1,2,2,0,3,'2025-10-03 13:05:25',NULL),(11,11,2,5,4,11,9,1,1,1,0,4,'2025-10-03 13:05:25',NULL),(12,12,2,4,3,7,11,1,2,1,0,5,'2025-10-03 13:05:25',NULL),(13,13,3,1,5,0,0,0,NULL,NULL,0,0,'2025-10-03 13:05:51',NULL),(14,14,3,5,2,0,0,0,NULL,NULL,0,0,'2025-10-03 13:05:51',NULL),(15,15,3,1,2,0,0,0,NULL,NULL,0,0,'2025-10-03 13:05:51',NULL),(16,13,3,1,5,0,0,0,1,1,0,0,'2025-10-03 13:05:54',NULL);
+insert  into `matches`(`id`,`entity_id`,`tournament_id`,`player1_id`,`player2_id`,`team1_id`,`team2_id`,`score1`,`score2`,`completed`,`first_server`,`serving_player`,`double_rotation_state`,`sides_swapped`,`match_order`,`valid_from`,`valid_to`) values (1,1,1,1,3,NULL,NULL,11,6,1,1,1,NULL,0,0,'2025-10-03 13:05:25',NULL),(2,2,1,5,3,NULL,NULL,11,4,1,1,2,NULL,0,1,'2025-10-03 13:05:25',NULL),(3,3,1,3,4,NULL,NULL,11,8,1,2,1,NULL,0,2,'2025-10-03 13:05:25',NULL),(4,4,1,5,4,NULL,NULL,11,6,1,1,1,NULL,0,3,'2025-10-03 13:05:25',NULL),(5,5,1,1,5,NULL,NULL,11,9,1,1,1,NULL,0,4,'2025-10-03 13:05:25',NULL),(6,6,1,1,4,NULL,NULL,11,5,1,2,2,NULL,0,5,'2025-10-03 13:05:25',NULL),(7,7,2,1,3,NULL,NULL,9,11,1,1,1,NULL,0,0,'2025-10-03 13:05:25',NULL),(8,8,2,5,3,NULL,NULL,11,5,1,1,1,NULL,0,1,'2025-10-03 13:05:25',NULL),(9,9,2,1,5,NULL,NULL,8,11,1,2,1,NULL,0,2,'2025-10-03 13:05:25',NULL),(10,10,2,1,4,NULL,NULL,11,1,1,2,2,NULL,0,3,'2025-10-03 13:05:25',NULL),(11,11,2,5,4,NULL,NULL,11,9,1,1,1,NULL,0,4,'2025-10-03 13:05:25',NULL),(12,12,2,4,3,NULL,NULL,7,11,1,2,1,NULL,0,5,'2025-10-03 13:05:25',NULL),(13,13,3,1,5,NULL,NULL,0,0,0,NULL,NULL,NULL,0,0,'2025-10-03 13:05:51',NULL),(14,14,3,5,2,NULL,NULL,0,0,0,NULL,NULL,NULL,0,0,'2025-10-03 13:05:51',NULL),(15,15,3,1,2,NULL,NULL,0,0,0,NULL,NULL,NULL,0,0,'2025-10-03 13:05:51',NULL),(16,13,3,1,5,NULL,NULL,0,0,0,1,1,NULL,0,0,'2025-10-03 13:05:54',NULL);
+/*Table structure for table `tournament_teams` */
+
+DROP TABLE IF EXISTS `tournament_teams`;
+
+CREATE TABLE `tournament_teams` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `entity_id` int(10) unsigned NOT NULL,
+  `tournament_id` int(11) NOT NULL,
+  `team_order` int(11) NOT NULL,
+  `player1_id` int(11) NOT NULL,
+  `player2_id` int(11) NOT NULL,
+  `valid_from` datetime NOT NULL DEFAULT current_timestamp(),
+  `valid_to` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_tournament_teams_tournament` (`tournament_id`),
+  KEY `idx_tournament_teams_entity_id` (`entity_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 /*Table structure for table `players` */
 
@@ -134,6 +157,7 @@ CREATE TABLE `tournaments` (
   `entity_id` int(10) unsigned NOT NULL,
   `name` varchar(255) NOT NULL,
   `points_to_win` int(11) NOT NULL DEFAULT 11,
+  `tournament_type` enum('single','double') NOT NULL DEFAULT 'single',
   `is_locked` tinyint(1) DEFAULT 0,
   `valid_from` datetime NOT NULL DEFAULT current_timestamp(),
   `valid_to` datetime DEFAULT NULL,
@@ -144,7 +168,7 @@ CREATE TABLE `tournaments` (
 
 /*Data for the table `tournaments` */
 
-insert  into `tournaments`(`id`,`entity_id`,`name`,`points_to_win`,`is_locked`,`valid_from`,`valid_to`) values (1,1,'Turnaj II. 24. 9. 2025',11,1,'2025-09-24 12:40:18',NULL),(2,2,'Turnaj I. 24. 9. 2025',11,1,'2025-09-24 12:20:27',NULL),(3,3,'Turnaj 3. 10. 2025',11,0,'2025-10-03 13:05:51',NULL);
+insert  into `tournaments`(`id`,`entity_id`,`name`,`points_to_win`,`tournament_type`,`is_locked`,`valid_from`,`valid_to`) values (1,1,'Turnaj II. 24. 9. 2025',11,'single',1,'2025-09-24 12:40:18',NULL),(2,2,'Turnaj I. 24. 9. 2025',11,'single',1,'2025-09-24 12:20:27',NULL),(3,3,'Turnaj 3. 10. 2025',11,'single',0,'2025-10-03 13:05:51',NULL);
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;

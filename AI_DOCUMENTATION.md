@@ -70,6 +70,7 @@ id (PK, AUTO_INCREMENT)
 entity_id (UNSIGNED INT)
 name (VARCHAR 255)
 points_to_win (INT, default 11)
+tournament_type ENUM('single','double') DEFAULT 'single'
 is_locked (TINYINT, default 0)
 valid_from (DATETIME)
 valid_to (DATETIME, NULL = aktuální)
@@ -80,13 +81,16 @@ valid_to (DATETIME, NULL = aktuální)
 id (PK, AUTO_INCREMENT)
 entity_id (UNSIGNED INT)
 tournament_id (INT, FK)
-player1_id (INT, FK)
+player1_id (INT, FK)   -- hlavní identifikátory pro singly (u čtyřhry reprezentují první hráče týmů)
 player2_id (INT, FK)
+team1_id (INT, FK na tournament_teams, NULL pro singly)
+team2_id (INT, FK na tournament_teams, NULL pro singly)
 score1 (INT, default 0)
 score2 (INT, default 0)
 completed (TINYINT, default 0)
-first_server (INT, nullable)
+first_server (INT, nullable)   -- 1 nebo 2 (strana), ne konkrétní hráč
 serving_player (INT, nullable)
+double_rotation_state (TEXT, JSON snapshot rotace podání ve čtyřhře)
 sides_swapped (TINYINT, default 0) - důležité!
 match_order (INT)
 valid_from (DATETIME)
@@ -102,6 +106,18 @@ entity_id (BIGINT UNSIGNED)
 tournament_id (INT, FK)
 player_id (INT, FK)
 player_order (INT)
+valid_from (DATETIME)
+valid_to (DATETIME, NULL = aktuální)
+```
+
+#### `tournament_teams`
+```sql
+id (PK, AUTO_INCREMENT)
+entity_id (INT UNSIGNED)
+tournament_id (INT, FK)
+team_order (INT)        -- index dvojice (0 = první tým, 1 = druhý, …)
+player1_id (INT, FK)
+player2_id (INT, FK)
 valid_from (DATETIME)
 valid_to (DATETIME, NULL = aktuální)
 ```
@@ -184,14 +200,16 @@ last_sync (TIMESTAMP)
   "name": "Název turnaje",
   "pointsToWin": 11,
   "createdAt": "2025-10-03 13:05:25",
-  "playerIds": [1, 2, 3, 4]
+  "playerIds": [1, 2, 3, 4],
+  "type": "single" // nebo "double"
 }
 ```
 
 **Chování:**
 - Vytvoří turnaj s `entity_id = MAX(entity_id) + 1`
 - Vytvoří vazby v `tournament_players`
-- Vygeneruje všechny možné zápasy (každý s každým)
+- Vygeneruje všechny možné zápasy (singl každý s každým, čtyřhra bere dvojice podle pořadí hráčů)
+- Při čtyřhře vyžaduje sudý počet hráčů (4–16). Dvojice tvoří vždy dva po sobě jdoucí hráči v `playerIds`.
 
 **Frontend implementace:**
 - Akce `create-tournament` automaticky kontroluje unikátnost názvu pomocí `generateUniqueTournamentName()`
@@ -209,7 +227,8 @@ last_sync (TIMESTAMP)
     "pointsToWin": 21,
     "isLocked": false,
     "createdAt": "2025-10-03 13:05:25",
-    "playerIds": [1, 2, 3]
+    "playerIds": [1, 2, 3],
+    "type": "single"
   }
 }
 ```
@@ -228,18 +247,30 @@ last_sync (TIMESTAMP)
     "tournament_id": 1,
     "player1Id": 1,
     "player2Id": 2,
+    "team1Id": 10,
+    "team2Id": 11,
     "score1": 11,
     "score2": 9,
     "completed": 1,
     "firstServer": 1,
     "servingPlayer": 1,
     "match_order": 0,
-    "sidesSwapped": 0
+    "sidesSwapped": 0,
+    "doubleRotationState": {
+      "order": [
+        { "playerId": 1, "side": 1 },
+        { "playerId": 2, "side": 2 },
+        { "playerId": 3, "side": 1 },
+        { "playerId": 4, "side": 2 }
+      ],
+      "currentIndex": 2,
+      "pointsServedThisTurn": 1
+    }
   }
 }
 ```
 
-**DŮLEŽITÉ:** Vždy musí obsahovat `sidesSwapped`!
+**DŮLEŽITÉ:** Vždy musí obsahovat `sidesSwapped`! U čtyřher navíc posílejte `team1Id`, `team2Id` a aktuální `doubleRotationState` (JSON).
 
 #### Akce: `savePlayer`
 
@@ -322,6 +353,26 @@ last_sync (TIMESTAMP)
 - Formát data pro MySQL: `YYYY-MM-DD HH:MM:SS` (ne ISO 8601)
 - **Inteligentní názvy:** Pokud turnaj obsahuje dnešní datum, použije se stávající logika s číslem. Pokud obsahuje starší datum, použije se dnešní datum v názvu
 - Používá funkci `generateUniqueTournamentName()` pro generování unikátního názvu
+- **Respektuje formát turnaje** – typ (`single`/`double`) a pořadí hráčů se kopíruje 1:1. U čtyřher jsou automaticky vytvořeny stejné dvojice a všechny nové zápasy mají `sidesSwapped = true`.
+
+### Čtyřhry (doubles)
+
+- Typ turnaje (`tournament_type`, také `type` v API) určuje, zda jde o singl nebo čtyřhru. Čtyřhra vyžaduje 4–16 hráčů a sudý počet hráčů.
+- Dvojice se skládají podle pořadí hráčů v turnaji: [0,1] je tým A, [2,3] tým B atd. Dvojice jsou uloženy v tabulce `tournament_teams`.
+- Zápasy ve čtyřhře odkazují na `team1_id`/`team2_id` a ukládají JSON `double_rotation_state` (stav podávací rotace).
+- Oficiální střídání podání:
+  - Po výběru strany (`firstServer` = 1/2) se automaticky nastaví pořadí A1 → B1 → A2 → B2.
+  - Malý set (11 bodů): po úvodním podání se střídá každé 2 body; po dosažení 10:10 se střídá po jednom bodu.
+  - Velký set (21 bodů): střídání každých 5 bodů, při 20:20 po jednom bodu.
+- UI:
+  - Vytváření turnaje nabízí přepínač singl/čtyřhra včetně validace počtu hráčů.
+  - V nastavení turnaje se zobrazuje formát a limit hráčů (8 vs 16); při čtyřhře se aplikuje kontrola sudého počtu.
+  - Scoreboard zobrazuje názvy týmů (`Honza + Petr`) a seznam jednotlivých hráčů pod názvem.
+  - Modální okno „Kdo má první podání?“ u čtyřhry nabízí výběr týmu (ne konkrétního hráče).
+  - Při kopírování turnaje se zachovají dvojice a pro každý zápas se automaticky nastaví `sidesSwapped = true`.
+- Statistiky:
+  - Detail turnaje (stats screen) obsahuje kromě hráčského žebříčku také týmovou tabulku (pokud je turnaj typu double).
+  - Celkové statistiky (`overall-stats-screen`) zobrazují kromě hráčů i agregované výsledky týmů napříč všemi čtyřhrami (identifikace podle seřazené dvojice hráčů).
 
 ### Vrácení posledního bodu (Undo)
 

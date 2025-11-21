@@ -189,6 +189,7 @@
                 <button data-action="export-pdf" class="btn btn-primary flex-1"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
             </div>
             <div id="stats-leaderboard" class="bg-white p-4 rounded-xl shadow-sm"></div>
+            <div id="stats-team-leaderboard" class="bg-white p-4 rounded-xl shadow-sm"></div>
             <div class="space-y-2"><h2 class="text-xl font-bold">Vzájemné zápasy</h2><div id="stats-matrix" class="bg-white p-4 rounded-xl shadow-sm overflow-x-auto"></div></div>
         </div>
         <div id="overall-stats-screen" class="screen space-y-6">
@@ -203,6 +204,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     let state = { settings: { soundsEnabled: true, voiceAssistEnabled: false }, playerDatabase: [], tournaments: [], activeTournamentId: null, activeMatchId: null, scoreHistory: [] };
     const playerColors = ["bg-red-500", "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-yellow-500", "bg-pink-500", "bg-indigo-500", "bg-teal-500"];
+    const TOURNAMENT_TYPES = { SINGLE: 'single', DOUBLE: 'double' };
     const app = document.getElementById('app');
     const screens = { main: document.getElementById('main-screen'), playerDb: document.getElementById('player-db-screen'), tournament: document.getElementById('tournament-screen'), game: document.getElementById('game-screen'), stats: document.getElementById('stats-screen'), overallStats: document.getElementById('overall-stats-screen') };
     const modalsContainer = document.getElementById('modals-container');
@@ -232,32 +234,51 @@ document.addEventListener('DOMContentLoaded', () => {
             showLockedTournaments: false,
             ...(data.settings || {})
         };
-        state.playerDatabase = data.playerDatabase.map(p => ({
+        state.playerDatabase = (data.playerDatabase || []).map(p => ({
             id: parseInt(p.id, 10),
             name: p.name,
             photoUrl: p.photo_url,
             strengths: p.strengths,
             weaknesses: p.weaknesses
         }));
-        state.tournaments = data.tournaments.map(t => ({
-            ...t,
-            id: parseInt(t.id, 10),
-            pointsToWin: parseInt(t.points_to_win, 10),
-            isLocked: !!parseInt(t.is_locked, 10),
-            playerIds: t.playerIds.map(id => parseInt(id, 10)),
-            matches: t.matches.map(m => ({
-                ...m,
-                id: m.id,
-                player1Id: parseInt(m.player1_id, 10),
-                player2Id: parseInt(m.player2_id, 10),
-                score1: parseInt(m.score1, 10),
-                score2: parseInt(m.score2, 10),
-                completed: !!parseInt(m.completed, 10),
-                firstServer: m.first_server ? parseInt(m.first_server, 10) : null,
-                servingPlayer: m.serving_player ? parseInt(m.serving_player, 10) : null,
-                sidesSwapped: !!parseInt(m.sides_swapped, 10)
-            }))
-        }));
+        state.tournaments = (data.tournaments || []).map(raw => {
+            const normalizedMatches = (raw.matches || []).map(m => {
+                let parsedRotation = null;
+                if (m.double_rotation_state) {
+                    try { parsedRotation = JSON.parse(m.double_rotation_state); } catch (e) { parsedRotation = null; }
+                }
+                return {
+                    id: parseInt(m.id, 10),
+                    player1Id: m.player1_id !== null ? parseInt(m.player1_id, 10) : null,
+                    player2Id: m.player2_id !== null ? parseInt(m.player2_id, 10) : null,
+                    team1Id: m.team1_id !== null ? parseInt(m.team1_id, 10) : null,
+                    team2Id: m.team2_id !== null ? parseInt(m.team2_id, 10) : null,
+                    score1: parseInt(m.score1, 10),
+                    score2: parseInt(m.score2, 10),
+                    completed: !!parseInt(m.completed, 10),
+                    firstServer: m.first_server !== null ? parseInt(m.first_server, 10) : null,
+                    servingPlayer: m.serving_player !== null ? parseInt(m.serving_player, 10) : null,
+                    sidesSwapped: !!parseInt(m.sides_swapped, 10),
+                    matchOrder: m.match_order !== null ? parseInt(m.match_order, 10) : 0,
+                    doubleRotationState: parsedRotation
+                };
+            });
+            return {
+                id: parseInt(raw.id, 10),
+                name: raw.name,
+                pointsToWin: parseInt(raw.points_to_win ?? raw.pointsToWin ?? 11, 10),
+                type: raw.type || TOURNAMENT_TYPES.SINGLE,
+                isLocked: !!parseInt(raw.is_locked ?? raw.isLocked ?? 0, 10),
+                createdAt: raw.createdAt,
+                playerIds: (raw.playerIds || []).map(id => parseInt(id, 10)),
+                teams: (raw.teams || []).map(team => ({
+                    id: parseInt(team.id, 10),
+                    playerIds: (team.playerIds || []).map(id => parseInt(id, 10)),
+                    order: parseInt(team.order ?? team.team_order ?? 0, 10)
+                })),
+                matches: normalizedMatches
+            };
+        });
     };
 
     const apiCall = async (action, payload) => {
@@ -352,6 +373,77 @@ document.addEventListener('DOMContentLoaded', () => {
     const getTournament = (id = state.activeTournamentId) => state.tournaments.find(t => t.id === id);
     const getMatch = (tournament, matchId) => tournament.matches.find(m => m.id == matchId);
     const formatDate = (iso) => new Date(iso).toLocaleDateString('cs-CZ');
+    const cloneState = (value) => value ? JSON.parse(JSON.stringify(value)) : null;
+    const isDoubleTournament = (t) => (t?.type || TOURNAMENT_TYPES.SINGLE) === TOURNAMENT_TYPES.DOUBLE;
+    const getPlayerColor = (tournament, playerId) => {
+        const index = tournament.playerIds.indexOf(playerId);
+        return playerColors[(index >= 0 ? index : 0) % playerColors.length];
+    };
+    const getTeamById = (t, teamId) => (t?.teams || []).find(team => team.id === teamId);
+    const getTeamPlayerIds = (t, teamId) => {
+        const team = getTeamById(t, teamId);
+        return team ? [...team.playerIds] : [];
+    };
+    const getSidePlayerIds = (t, match, side) => {
+        if (isDoubleTournament(t)) {
+            const teamId = side === 1 ? match.team1Id : match.team2Id;
+            const players = getTeamPlayerIds(t, teamId);
+            if (players.length > 0) {
+                return players;
+            }
+        }
+        const playerId = side === 1 ? match.player1Id : match.player2Id;
+        return playerId ? [playerId] : [];
+    };
+    const formatPlayersLabel = (playerIds) => {
+        const names = playerIds
+            .map(id => getGlobalPlayer(id)?.name)
+            .filter(Boolean);
+        return names.length ? names.join(' + ') : 'Neznámý tým';
+    };
+    const buildSideDescriptor = (t, playerIds, teamId) => {
+        const primaryPlayerId = playerIds[0] ?? null;
+        return {
+            teamId,
+            playerIds,
+            label: formatPlayersLabel(playerIds),
+            colorClass: primaryPlayerId !== null ? getPlayerColor(t, primaryPlayerId) : playerColors[0]
+        };
+    };
+    const getDisplaySides = (t, match) => {
+        const leftSideIndex = match.sidesSwapped ? 2 : 1;
+        const rightSideIndex = match.sidesSwapped ? 1 : 2;
+        const leftPlayers = getSidePlayerIds(t, match, leftSideIndex);
+        const rightPlayers = getSidePlayerIds(t, match, rightSideIndex);
+        const rawLeftPlayers = getSidePlayerIds(t, match, 1);
+        const rawRightPlayers = getSidePlayerIds(t, match, 2);
+        return {
+            left: buildSideDescriptor(t, leftPlayers, leftSideIndex === 1 ? match.team1Id : match.team2Id),
+            right: buildSideDescriptor(t, rightPlayers, rightSideIndex === 1 ? match.team1Id : match.team2Id),
+            raw: {
+                side1: buildSideDescriptor(t, rawLeftPlayers, match.team1Id),
+                side2: buildSideDescriptor(t, rawRightPlayers, match.team2Id)
+            }
+        };
+    };
+    const getTournamentTypeLabel = (t) => isDoubleTournament(t) ? 'Čtyřhra' : 'Dvouhra';
+    const getPlayerLimitForType = (type) => type === TOURNAMENT_TYPES.DOUBLE ? 16 : 8;
+    const getMinPlayersForType = (type) => type === TOURNAMENT_TYPES.DOUBLE ? 4 : 2;
+    const getTeamKey = (playerIds) => [...playerIds].sort((a, b) => a - b).join('-');
+    const getMatchResultForPlayers = (t, match, playerAId, playerBId) => {
+        const side1 = getSidePlayerIds(t, match, 1);
+        const side2 = getSidePlayerIds(t, match, 2);
+        const aOnSide1 = side1.includes(playerAId);
+        const aOnSide2 = side2.includes(playerAId);
+        const bOnSide1 = side1.includes(playerBId);
+        const bOnSide2 = side2.includes(playerBId);
+        if ((aOnSide1 && bOnSide2) || (aOnSide2 && bOnSide1)) {
+            const aScore = aOnSide1 ? match.score1 : match.score2;
+            const bScore = bOnSide1 ? match.score1 : match.score2;
+            return { aScore, bScore };
+        }
+        return null;
+    };
     const showScreen = (screenName) => { 
         const isGameScreen = screenName === 'game';
         if (!isGameScreen) {
@@ -373,10 +465,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     const templates = {
-        leaderboardTable: (stats, t) => `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">Poz.</th><th class="p-2">Hráč</th><th class="p-2 text-center">Vítězství</th><th class="p-2 text-center">Porážky</th><th class="p-2 text-center">Odehráno</th><th class="p-2 text-center">Úspěšnost</th></tr></thead><tbody>${stats.map((s, i) => `<tr class="border-b last:border-none"><td class="p-2 font-bold">${i === 0 && s.wins > 0 ? '🏆' : `#${i+1}`}</td><td class="p-2 flex items-center gap-2"><div class="w-4 h-4 rounded-full ${playerColors[t.playerIds.indexOf(s.player.id) % playerColors.length]}"></div> ${s.player.name}</td><td class="p-2 text-center font-bold text-green-600">${s.wins}</td><td class="p-2 text-center text-red-500">${s.losses}</td><td class="p-2 text-center">${s.played}</td><td class="p-2 text-center font-semibold">${s.played > 0 ? Math.round((s.wins / s.played) * 100) : 0}%</td></tr>`).join('')}</tbody></table></div>`
+        leaderboardTable: (stats, t) => `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">Poz.</th><th class="p-2">Hráč</th><th class="p-2 text-center">Vítězství</th><th class="p-2 text-center">Porážky</th><th class="p-2 text-center">Odehráno</th><th class="p-2 text-center">Úspěšnost</th></tr></thead><tbody>${stats.map((s, i) => `<tr class="border-b last:border-none"><td class="p-2 font-bold">${i === 0 && s.wins > 0 ? '🏆' : `#${i+1}`}</td><td class="p-2 flex items-center gap-2"><div class="w-4 h-4 rounded-full ${playerColors[t.playerIds.indexOf(s.player.id) % playerColors.length]}"></div> ${s.player.name}</td><td class="p-2 text-center font-bold text-green-600">${s.wins}</td><td class="p-2 text-center text-red-500">${s.losses}</td><td class="p-2 text-center">${s.played}</td><td class="p-2 text-center font-semibold">${s.played > 0 ? Math.round((s.wins / s.played) * 100) : 0}%</td></tr>`).join('')}</tbody></table></div>`,
+        teamLeaderboard: (stats) => stats.length ? `<div class="mt-4"><h3 class="text-lg font-semibold mb-2">Týmy</h3><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b"><th class="p-2">Poz.</th><th class="p-2">Tým</th><th class="p-2 text-center">V</th><th class="p-2 text-center">P</th><th class="p-2 text-center">Odehráno</th><th class="p-2 text-center">Skóre</th></tr></thead><tbody>${stats.map((s, i) => `<tr class="border-b last:border-none"><td class="p-2 font-bold">${i === 0 && s.wins > 0 ? '🥇' : `#${i+1}`}</td><td class="p-2">${s.label}</td><td class="p-2 text-center text-green-600 font-semibold">${s.wins}</td><td class="p-2 text-center text-red-500">${s.losses}</td><td class="p-2 text-center">${s.played}</td><td class="p-2 text-center">${s.scoreFor}:${s.scoreAgainst}</td></tr>`).join('')}</tbody></table></div></div>` : ''
     };
 
     function generateMatchesForTournament(tournament) {
+        if (isDoubleTournament(tournament)) return;
         const playerIds = tournament.playerIds;
         for (let i = 0; i < playerIds.length; i++) {
             for (let j = i + 1; j < playerIds.length; j++) {
@@ -390,6 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function smartShuffleMatches(matches) {
+        if (!matches.length) return [];
         if (matches.length < 3) return matches.sort(() => Math.random() - 0.5);
         let remaining = [...matches];
         let shuffled = [];
@@ -469,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     buttonClass = "bg-yellow-400 hover:bg-yellow-500 text-black";
                 }
 
-                return `<div class="bg-white p-4 rounded-xl shadow-sm space-y-3"><div class="flex justify-between items-start"><div><h2 class="text-xl font-bold ${nameClass}">${t.name}</h2><p class="text-sm text-gray-500">${t.playerIds.length} ${getCzechPlayerDeclension(t.playerIds.length)} &bull; ${completedCount}/${totalMatches} zápasů &bull; Vytvořeno: ${formatDate(t.createdAt)}</p>${winnerInfo}</div><div class="flex items-center gap-3 text-xl text-gray-400"><i class="fa-solid ${status.icon} ${status.color}" title="${status.text}"></i><button data-action="toggle-lock-main" data-id="${t.id}" class="text-xl" title="${t.isLocked ? 'Odemknout turnaj' : 'Zamknout turnaj'}">${t.isLocked ? '🔒' : '🔓'}</button></div></div>${!t.isLocked ? `<button data-action="open-tournament" data-id="${t.id}" class="btn ${buttonClass} w-full">${buttonText}</button>`: ''}</div>`;
+                return `<div class="bg-white p-4 rounded-xl shadow-sm space-y-3"><div class="flex justify-between items-start"><div><h2 class="text-xl font-bold ${nameClass}">${t.name}</h2><p class="text-sm text-gray-500">${t.playerIds.length} ${getCzechPlayerDeclension(t.playerIds.length)} &bull; ${getTournamentTypeLabel(t)} &bull; ${completedCount}/${totalMatches} zápasů &bull; Vytvořeno: ${formatDate(t.createdAt)}</p>${winnerInfo}</div><div class="flex items-center gap-3 text-xl text-gray-400"><i class="fa-solid ${status.icon} ${status.color}" title="${status.text}"></i><button data-action="toggle-lock-main" data-id="${t.id}" class="text-xl" title="${t.isLocked ? 'Odemknout turnaj' : 'Zamknout turnaj'}">${t.isLocked ? '🔒' : '🔓'}</button></div></div>${!t.isLocked ? `<button data-action="open-tournament" data-id="${t.id}" class="btn ${buttonClass} w-full">${buttonText}</button>`: ''}</div>`;
             }).join('');
         }
         showScreen('main');
@@ -481,36 +576,59 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('tournament-progress').textContent = `${t.matches.filter(m => m.completed).length}/${t.matches.length} zápasů dokončeno`;
         
         const renderMatch = (m, isCompleted, index) => {
-            let p1 = getGlobalPlayer(m.player1Id); 
-            let p2 = getGlobalPlayer(m.player2Id);
-            
-            if (m.sidesSwapped) {
-                [p1, p2] = [p2, p1]; // Prohodíme hráče pro zobrazení
-            }
-
-            if (!p1 || !p2) return '';
+            const sides = getDisplaySides(t, m);
+            if (!sides.left.playerIds.length || !sides.right.playerIds.length) return '';
             const isSuspended = !isCompleted && m.firstServer !== null;
-            const p1Color = playerColors[t.playerIds.indexOf(p1.id) % playerColors.length];
-            const p2Color = playerColors[t.playerIds.indexOf(p2.id) % playerColors.length];
-            const playerIcon = (player, color) => `<div class="w-6 h-6 ${color} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">${player.name.charAt(0).toUpperCase()}</div>`;
             const servingIndicator = ' <span class="text-base">🏓</span>';
-            
-            let content;
+            const servingPlayerId = m.servingPlayer;
+            const serveBadge = (side) => (isSuspended && servingPlayerId && side.playerIds.includes(servingPlayerId)) ? servingIndicator : '';
+            const makeBadge = (side, alignRight = false, highlight = false) => `
+                <div class="flex ${alignRight ? 'justify-end text-right' : 'justify-start'} items-center gap-2 w-2/5 ${highlight ? 'font-extrabold' : ''}">
+                    ${alignRight ? '' : `<div class="w-6 h-6 ${side.colorClass} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">${side.label.charAt(0).toUpperCase()}</div>`}
+                    <div class="flex flex-col ${alignRight ? 'items-end' : 'items-start'}">
+                        <span>${side.label}${serveBadge(side)}</span>
+                        ${isDoubleTournament(t) ? `<span class="text-xs text-gray-500">${side.playerIds.map(id => getGlobalPlayer(id)?.name || '???').join(' • ')}</span>` : ''}
+                    </div>
+                    ${alignRight ? `<div class="w-6 h-6 ${side.colorClass} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">${side.label.charAt(0).toUpperCase()}</div>` : ''}
+                </div>
+            `;
+            const upcomingMatches = t.matches.filter(x => !x.completed);
             if (isCompleted) {
-                const p1Original = getGlobalPlayer(m.player1Id);
-                const p1Won = m.score1 > m.score2;
+                const winnerSide = m.score1 === m.score2 ? null : (m.score1 > m.score2 ? 1 : 2);
                 const scoreDisplay = m.sidesSwapped ? `${m.score2} : ${m.score1}` : `${m.score1} : ${m.score2}`;
-                const winner = p1Won ? p1Original : getGlobalPlayer(m.player2Id);
-
-                content = `<div class="flex items-center gap-2 flex-grow"><div class="flex items-center gap-2 w-2/5 ${winner.id === p1.id ? 'font-extrabold' : ''}">${playerIcon(p1, p1Color)}<span>${p1.name}</span></div><div class="font-bold text-lg">${scoreDisplay}</div><div class="flex items-center gap-2 w-2/5 justify-end ${winner.id === p2.id ? 'font-extrabold' : ''}"><span class="text-right">${p2.name}</span>${playerIcon(p2, p2Color)}</div></div><button data-action="edit-match" data-id="${m.id}" class="btn bg-yellow-400 hover:bg-yellow-500 text-white aspect-square !p-0 w-10 h-10" title="Upravit výsledek" ${t.isLocked ? 'disabled' : ''}><i class="fa-solid fa-pencil"></i></button>`;
-            } else {
-                let p1ServeHTML = isSuspended && m.servingPlayer === p1.id ? servingIndicator : '';
-                let p2ServeHTML = isSuspended && m.servingPlayer === p2.id ? servingIndicator : '';
-                const scoreOrVs = isSuspended ? `<div class="font-bold text-lg">${m.sidesSwapped ? m.score2 : m.score1} : ${m.sidesSwapped ? m.score1 : m.score2}</div>` : `<div class="text-gray-400">vs</div>`;
-                const upcomingMatches = t.matches.filter(x=>!x.completed);
-                content = `<div class="flex items-center gap-1"><button data-action="move-match" data-id="${m.id}" data-dir="up" class="btn btn-secondary !p-0 w-6 h-6 text-xs" ${index === 0 ? 'disabled' : ''} title="Posunout nahoru">▲</button><button data-action="move-match" data-id="${m.id}" data-dir="down" class="btn btn-secondary !p-0 w-6 h-6 text-xs" ${index === upcomingMatches.length-1 ? 'disabled' : ''} title="Posunout dolů">▼</button></div><button data-action="swap-sides" data-id="${m.id}" class="btn btn-secondary !p-0 w-8 h-8 flex-shrink-0" title="Prohodit strany"><i class="fa-solid fa-right-left"></i></button><div class="flex items-center gap-2 flex-grow"><div class="flex items-center gap-2 w-2/5">${playerIcon(p1, p1Color)}<span>${p1.name}${p1ServeHTML}</span></div>${scoreOrVs}<div class="flex items-center gap-2 w-2/5 justify-end"><span class="text-right">${p2.name}${p2ServeHTML}</span>${playerIcon(p2, p2Color)}</div></div><button data-action="play-match" data-id="${m.id}" class="btn btn-primary aspect-square !p-0 w-10 h-10 text-lg" title="${isSuspended ? 'Pokračovat v zápase' : 'Hrát zápas'}" ${t.isLocked ? 'disabled' : ''}>${isSuspended ? '<i class="fa-solid fa-clock-rotate-left"></i>' : '<i class="fa-solid fa-play"></i>'}</button>`;
+                const leftHighlight = (m.sidesSwapped ? winnerSide === 2 : winnerSide === 1);
+                const rightHighlight = (m.sidesSwapped ? winnerSide === 1 : winnerSide === 2);
+                return `<div class="bg-white p-3 rounded-xl shadow-sm flex items-center justify-between mt-2 gap-2">
+                    <div class="flex items-center gap-2 flex-grow">
+                        ${makeBadge(sides.left, false, leftHighlight)}
+                        <div class="font-bold text-lg">${scoreDisplay}</div>
+                        ${makeBadge(sides.right, true, rightHighlight)}
+                    </div>
+                    <button data-action="edit-match" data-id="${m.id}" class="btn bg-yellow-400 hover:bg-yellow-500 text-white aspect-square !p-0 w-10 h-10" title="Upravit výsledek" ${t.isLocked ? 'disabled' : ''}>
+                        <i class="fa-solid fa-pencil"></i>
+                    </button>
+                </div>`;
             }
-            return `<div class="bg-white p-3 rounded-xl shadow-sm flex items-center justify-between mt-2 gap-2">${content}</div>`;
+
+            const scoreOrVs = isSuspended
+                ? `<div class="font-bold text-lg">${m.sidesSwapped ? m.score2 : m.score1} : ${m.sidesSwapped ? m.score1 : m.score2}</div>`
+                : `<div class="text-gray-400">vs</div>`;
+
+            return `<div class="bg-white p-3 rounded-xl shadow-sm flex items-center justify-between mt-2 gap-2">
+                <div class="flex items-center gap-1">
+                    <button data-action="move-match" data-id="${m.id}" data-dir="up" class="btn btn-secondary !p-0 w-6 h-6 text-xs" ${index === 0 ? 'disabled' : ''} title="Posunout nahoru">▲</button>
+                    <button data-action="move-match" data-id="${m.id}" data-dir="down" class="btn btn-secondary !p-0 w-6 h-6 text-xs" ${index === upcomingMatches.length - 1 ? 'disabled' : ''} title="Posunout dolů">▼</button>
+                </div>
+                <button data-action="swap-sides" data-id="${m.id}" class="btn btn-secondary !p-0 w-8 h-8 flex-shrink-0" title="Prohodit strany"><i class="fa-solid fa-right-left"></i></button>
+                <div class="flex items-center gap-2 flex-grow">
+                    ${makeBadge(sides.left, false, false)}
+                    ${scoreOrVs}
+                    ${makeBadge(sides.right, true, false)}
+                </div>
+                <button data-action="play-match" data-id="${m.id}" class="btn btn-primary aspect-square !p-0 w-10 h-10 text-lg" title="${isSuspended ? 'Pokračovat v zápase' : 'Hrát zápas'}" ${t.isLocked ? 'disabled' : ''}>
+                    ${isSuspended ? '<i class="fa-solid fa-clock-rotate-left"></i>' : '<i class="fa-solid fa-play"></i>'}
+                </button>
+            </div>`;
         };
 
         const upcomingContainer = document.getElementById('upcoming-matches-container');
@@ -538,7 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showScreen('tournament');
     };
     
-    let tempPlayerIds = []; let autocompleteIndex = -1;
+    let tempPlayerIds = []; let tempTournamentType = TOURNAMENT_TYPES.SINGLE; let autocompleteIndex = -1;
 
     function setupAutocomplete(inputId, containerId, onSelect, currentIds) {
         const input = document.getElementById(inputId); const suggestionsContainer = document.getElementById(containerId);
@@ -582,29 +700,130 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     const calculateStats = (t) => {
-        const stats = t.playerIds.map(id => ({ player: getGlobalPlayer(id), played: 0, wins: 0, losses: 0, scoreFor: 0, scoreAgainst: 0 }));
-        t.matches.filter(m => m.completed).forEach(m => {
-            const s1 = stats.find(s => s.player && s.player.id === m.player1Id);
-            const s2 = stats.find(s => s.player && s.player.id === m.player2Id);
-            if (!s1 || !s2) return;
-            s1.played++; s2.played++; s1.scoreFor += m.score1; s1.scoreAgainst += m.score2; s2.scoreFor += m.score2; s2.scoreAgainst += m.score1;
-            if (m.score1 > m.score2) { s1.wins++; s2.losses++; } else { s2.wins++; s1.losses++; }
+        const statsMap = new Map();
+        t.playerIds.forEach(id => {
+            statsMap.set(id, { player: getGlobalPlayer(id), played: 0, wins: 0, losses: 0, scoreFor: 0, scoreAgainst: 0 });
         });
-        return stats.filter(s => s.player).sort((a, b) => {
+        t.matches.filter(m => m.completed).forEach(m => {
+            const side1Players = getSidePlayerIds(t, m, 1);
+            const side2Players = getSidePlayerIds(t, m, 2);
+            const winnerSide = m.score1 === m.score2 ? null : (m.score1 > m.score2 ? 1 : 2);
+            side1Players.forEach(id => {
+                const stat = statsMap.get(id);
+                if (!stat) return;
+                stat.played++;
+                stat.scoreFor += m.score1;
+                stat.scoreAgainst += m.score2;
+                if (winnerSide === 1) stat.wins++; else if (winnerSide === 2) stat.losses++;
+            });
+            side2Players.forEach(id => {
+                const stat = statsMap.get(id);
+                if (!stat) return;
+                stat.played++;
+                stat.scoreFor += m.score2;
+                stat.scoreAgainst += m.score1;
+                if (winnerSide === 2) stat.wins++; else if (winnerSide === 1) stat.losses++;
+            });
+        });
+        return Array.from(statsMap.values())
+            .filter(s => s.player)
+            .sort((a, b) => {
+                if (b.wins !== a.wins) return b.wins - a.wins;
+                const scoreDiffA = a.scoreFor - a.scoreAgainst; const scoreDiffB = b.scoreFor - b.scoreAgainst;
+                if (scoreDiffB !== scoreDiffA) return scoreDiffB - scoreDiffA;
+                return b.scoreFor - a.scoreFor;
+            });
+    };
+    const calculateTeamStats = (t) => {
+        if (!isDoubleTournament(t)) return [];
+        const statsMap = new Map();
+        (t.teams || []).forEach(team => {
+            statsMap.set(team.id, {
+                team,
+                label: formatPlayersLabel(team.playerIds),
+                played: 0,
+                wins: 0,
+                losses: 0,
+                scoreFor: 0,
+                scoreAgainst: 0
+            });
+        });
+        t.matches.filter(m => m.completed).forEach(m => {
+            const team1 = statsMap.get(m.team1Id);
+            const team2 = statsMap.get(m.team2Id);
+            if (!team1 || !team2) return;
+            team1.played++; team2.played++;
+            team1.scoreFor += m.score1; team1.scoreAgainst += m.score2;
+            team2.scoreFor += m.score2; team2.scoreAgainst += m.score1;
+            if (m.score1 > m.score2) { team1.wins++; team2.losses++; } else { team2.wins++; team1.losses++; }
+        });
+        return Array.from(statsMap.values()).sort((a, b) => {
             if (b.wins !== a.wins) return b.wins - a.wins;
-            const scoreDiffA = a.scoreFor - a.scoreAgainst; const scoreDiffB = b.scoreFor - b.scoreAgainst;
-            if (scoreDiffB !== scoreDiffA) return scoreDiffB - scoreDiffA;
+            const diffA = a.scoreFor - a.scoreAgainst;
+            const diffB = b.scoreFor - b.scoreAgainst;
+            if (diffB !== diffA) return diffB - diffA;
             return b.scoreFor - a.scoreFor;
         });
     };
     
     const checkWinCondition = (match, pointsToWin) => {
-        if (match.score1 >= pointsToWin && match.score1 >= match.score2 + 2) return match.player1Id;
-        if (match.score2 >= pointsToWin && match.score2 >= match.score1 + 2) return match.player2Id;
+        if (match.score1 >= pointsToWin && match.score1 >= match.score2 + 2) return 1;
+        if (match.score2 >= pointsToWin && match.score2 >= match.score1 + 2) return 2;
         return null;
     };
     
-    const recalculateServiceState = (match, pointsToWin) => {
+    const getDoubleServeBlockSize = (match, tournament) => {
+        const base = tournament.pointsToWin === 21 ? 5 : 2;
+        const deuceThreshold = tournament.pointsToWin - 1;
+        if (match.score1 >= deuceThreshold && match.score2 >= deuceThreshold) {
+            return 1;
+        }
+        return base;
+    };
+
+    const initializeDoubleRotationState = (tournament, match, firstServerSide) => {
+        const team1Players = getSidePlayerIds(tournament, match, 1);
+        const team2Players = getSidePlayerIds(tournament, match, 2);
+        const order = [
+            { playerId: team1Players[0], side: 1 },
+            { playerId: team2Players[0], side: 2 },
+            { playerId: team1Players[1], side: 1 },
+            { playerId: team2Players[1], side: 2 }
+        ].filter(entry => entry.playerId);
+        if (!order.length) {
+            match.doubleRotationState = null;
+            match.servingPlayer = null;
+            return;
+        }
+        const startingIndex = firstServerSide === 1 ? 0 : 1;
+        match.doubleRotationState = {
+            order,
+            currentIndex: startingIndex % order.length,
+            pointsServedThisTurn: 0
+        };
+        match.servingPlayer = order[startingIndex % order.length]?.playerId ?? null;
+    };
+
+    const advanceDoubleServeState = (match, tournament) => {
+        if (!match.doubleRotationState || !match.doubleRotationState.order?.length) return;
+        const blockSize = getDoubleServeBlockSize(match, tournament);
+        match.doubleRotationState.pointsServedThisTurn = (match.doubleRotationState.pointsServedThisTurn || 0) + 1;
+        if (match.doubleRotationState.pointsServedThisTurn >= blockSize) {
+            match.doubleRotationState.pointsServedThisTurn = 0;
+            match.doubleRotationState.currentIndex = (match.doubleRotationState.currentIndex + 1) % match.doubleRotationState.order.length;
+        }
+        match.servingPlayer = match.doubleRotationState.order[match.doubleRotationState.currentIndex]?.playerId ?? null;
+    };
+
+    const recalculateServiceState = (match, tournament) => {
+        if (isDoubleTournament(tournament)) {
+            if (match.doubleRotationState && match.doubleRotationState.order?.length) {
+                const idx = match.doubleRotationState.currentIndex ?? 0;
+                match.servingPlayer = match.doubleRotationState.order[idx % match.doubleRotationState.order.length]?.playerId ?? null;
+            }
+            return;
+        }
+        const pointsToWin = tournament.pointsToWin;
         const totalScore = match.score1 + match.score2;
         const p1Id = match.player1Id;
         const p2Id = match.player2Id;
@@ -659,10 +878,11 @@ document.addEventListener('DOMContentLoaded', () => {
         m.score2 = lastState.score2;
         m.servingPlayer = lastState.servingPlayer;
         m.firstServer = lastState.firstServer;
+        m.doubleRotationState = cloneState(lastState.doubleRotationState);
         
         // Znovu vypočítáme stav podání
         if (m.firstServer) {
-            recalculateServiceState(m, t.pointsToWin);
+            recalculateServiceState(m, t);
         }
         
         // Aktualizujeme v databázi
@@ -673,13 +893,20 @@ document.addEventListener('DOMContentLoaded', () => {
         renderGameBoard();
     };
 
-    const updateScore = async (playerId, delta) => {
+    const updateScore = async (playerId, delta, sideOverride = null) => {
         const t = getTournament(); 
         const m = getMatch(t, state.activeMatchId);
         if (!t || !m) return;
 
-        const isPlayer1 = m.player1Id === playerId;
-        const scoreProp = isPlayer1 ? 'score1' : 'score2';
+        const sidePlayers = {
+            1: getSidePlayerIds(t, m, 1),
+            2: getSidePlayerIds(t, m, 2)
+        };
+        const scoringSide = sideOverride ?? (playerId !== null
+            ? (sidePlayers[1].includes(playerId) ? 1 : (sidePlayers[2].includes(playerId) ? 2 : null))
+            : null);
+        if (scoringSide === null) return;
+        const scoreProp = scoringSide === 1 ? 'score1' : 'score2';
 
         if (delta > 0 && checkWinCondition(m, t.pointsToWin)) return;
         
@@ -687,45 +914,54 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentScore + delta >= 0) {
             // Uložíme historii před změnou (pouze pro přidání bodu)
             if (delta > 0) {
-                state.scoreHistory.push({
-                    matchId: m.id,
-                    score1: m.score1,
-                    score2: m.score2,
-                    servingPlayer: m.servingPlayer,
-                    firstServer: m.firstServer
-                });
-            }
-            
+                    state.scoreHistory.push({
+                        matchId: m.id,
+                        score1: m.score1,
+                        score2: m.score2,
+                        servingPlayer: m.servingPlayer,
+                        firstServer: m.firstServer,
+                        doubleRotationState: cloneState(m.doubleRotationState)
+                    });
             m[scoreProp] += delta;
             
-            recalculateServiceState(m, t.pointsToWin);
-            playSound(isPlayer1 ? 1 : 2); // Zvuk zůstává navázaný na pozici
-            
-            if (state.settings.voiceAssistEnabled) {
-                const servingPlayer = getGlobalPlayer(m.servingPlayer);
-                const servingPlayerIsP1 = m.servingPlayer === m.player1Id;
-                
-                const servingPlayerScore = servingPlayerIsP1 ? m.score1 : m.score2;
-                const otherPlayerScore = servingPlayerIsP1 ? m.score2 : m.score1;
-                
-                if (m.completed) { // This state is set after checkWinCondition, so we check again
-                    const winnerCheck = checkWinCondition(m, t.pointsToWin);
-                    if(winnerCheck) {
-                        const winner = winnerCheck === 1 ? getGlobalPlayer(m.player1Id) : getGlobalPlayer(m.player2Id);
-                        const winnerScore = Math.max(m.score1, m.score2);
-                        const loserScore = Math.min(m.score1, m.score2);
-                        speak(`Konec zápasu. Vítěz ${winner.name}. ${winnerScore} : ${loserScore}`);
-                    }
+            if (isDoubleTournament(t)) {
+                if (!m.doubleRotationState) {
+                    initializeDoubleRotationState(t, m, m.firstServer || 1);
                 } else {
-                    let speechText = `${servingPlayerScore} : ${otherPlayerScore}, podání ${servingPlayer.name}`;
-                    // S pravděpodobností 40% přidáme náhodnou hlášku
-                    if (Math.random() < 0.4) {
-                        const randomPhrase = encouragingPhrases[Math.floor(Math.random() * encouragingPhrases.length)];
-                        speechText += `. ${randomPhrase}`;
-                    }
-                    speak(speechText);
+                    advanceDoubleServeState(m, t);
                 }
+            } else {
+                recalculateServiceState(m, t);
             }
+            playSound(scoringSide);
+        
+                if (state.settings.voiceAssistEnabled) {
+                    const side1Players = getSidePlayerIds(t, m, 1);
+                    const side2Players = getSidePlayerIds(t, m, 2);
+                    const servingSide = side1Players.includes(m.servingPlayer) ? 1 : (side2Players.includes(m.servingPlayer) ? 2 : null);
+                    const servingLabel = isDoubleTournament(t)
+                        ? (servingSide ? formatPlayersLabel(servingSide === 1 ? side1Players : side2Players) : '')
+                        : (m.servingPlayer ? (getGlobalPlayer(m.servingPlayer)?.name || '') : '');
+                    const servingPlayerScore = servingSide === 1 ? m.score1 : m.score2;
+                    const otherPlayerScore = servingSide === 1 ? m.score2 : m.score1;
+                    
+                    if (m.completed) { // This state je nastaveno po checkWinCondition
+                        const winnerSide = checkWinCondition(m, t.pointsToWin);
+                        if (winnerSide) {
+                            const winnerLabel = formatPlayersLabel(winnerSide === 1 ? side1Players : side2Players);
+                            const winnerScore = Math.max(m.score1, m.score2);
+                            const loserScore = Math.min(m.score1, m.score2);
+                            speak(`Konec zápasu. Vítěz ${winnerLabel}. ${winnerScore} : ${loserScore}`);
+                        }
+                    } else if (servingLabel) {
+                        let speechText = `${servingPlayerScore} : ${otherPlayerScore}, podání ${servingLabel}`;
+                        if (Math.random() < 0.4) {
+                            const randomPhrase = encouragingPhrases[Math.floor(Math.random() * encouragingPhrases.length)];
+                            speechText += `. ${randomPhrase}`;
+                        }
+                        speak(speechText);
+                    }
+                }
 
             const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
             await apiCall('updateMatch', { id: m.id, data: matchPayload });
@@ -743,13 +979,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const completedMatches = t.matches.filter(m => m.completed);
             const playerIdsInTournament = new Set();
             completedMatches.forEach(m => {
-                playerIdsInTournament.add(m.player1Id); playerIdsInTournament.add(m.player2Id);
-                const s1 = overallStats.get(m.player1Id); const s2 = overallStats.get(m.player2Id);
-                if (!s1 || !s2) return;
-                s1.matches++; s2.matches++; s1.scoreFor += m.score1; s1.scoreAgainst += m.score2;
-                s2.scoreFor += m.score2; s2.scoreAgainst += m.score1;
-                if (m.score1 > m.score2) { s1.wins++; s2.losses++; }
-                else { s2.wins++; s1.losses++; }
+                const side1Players = getSidePlayerIds(t, m, 1);
+                const side2Players = getSidePlayerIds(t, m, 2);
+                side1Players.forEach(id => playerIdsInTournament.add(id));
+                side2Players.forEach(id => playerIdsInTournament.add(id));
+                const winnerSide = m.score1 === m.score2 ? null : (m.score1 > m.score2 ? 1 : 2);
+                side1Players.forEach(id => {
+                    const stat = overallStats.get(id);
+                    if (!stat) return;
+                    stat.matches++;
+                    stat.scoreFor += m.score1;
+                    stat.scoreAgainst += m.score2;
+                    if (winnerSide === 1) stat.wins++; else if (winnerSide === 2) stat.losses++;
+                });
+                side2Players.forEach(id => {
+                    const stat = overallStats.get(id);
+                    if (!stat) return;
+                    stat.matches++;
+                    stat.scoreFor += m.score2;
+                    stat.scoreAgainst += m.score1;
+                    if (winnerSide === 2) stat.wins++; else if (winnerSide === 1) stat.losses++;
+                });
             });
             playerIdsInTournament.forEach(id => { const s = overallStats.get(id); if(s) s.tournaments++; });
             const isFinished = t.matches.length > 0 && completedMatches.length === t.matches.length;
@@ -763,11 +1013,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         return Array.from(overallStats.values()).sort((a, b) => b.wins - a.wins || (b.scoreFor - b.scoreAgainst) - (a.scoreFor - a.scoreAgainst));
     };
+    const calculateOverallTeamStats = () => {
+        const teamStatsMap = new Map();
+        state.tournaments.filter(isDoubleTournament).forEach(t => {
+            const completedMatches = t.matches.filter(m => m.completed);
+            completedMatches.forEach(m => {
+                const team1Players = getSidePlayerIds(t, m, 1);
+                const team2Players = getSidePlayerIds(t, m, 2);
+                const key1 = getTeamKey(team1Players);
+                const key2 = getTeamKey(team2Players);
+                if (!teamStatsMap.has(key1)) {
+                    teamStatsMap.set(key1, { players: team1Players.slice().sort((a, b) => a - b), label: formatPlayersLabel(team1Players), matches: 0, wins: 0, losses: 0, scoreFor: 0, scoreAgainst: 0, tournaments: new Set([t.id]) });
+                } else {
+                    teamStatsMap.get(key1).tournaments.add(t.id);
+                }
+                if (!teamStatsMap.has(key2)) {
+                    teamStatsMap.set(key2, { players: team2Players.slice().sort((a, b) => a - b), label: formatPlayersLabel(team2Players), matches: 0, wins: 0, losses: 0, scoreFor: 0, scoreAgainst: 0, tournaments: new Set([t.id]) });
+                } else {
+                    teamStatsMap.get(key2).tournaments.add(t.id);
+                }
+                const team1 = teamStatsMap.get(key1);
+                const team2 = teamStatsMap.get(key2);
+                team1.matches++; team2.matches++;
+                team1.scoreFor += m.score1; team1.scoreAgainst += m.score2;
+                team2.scoreFor += m.score2; team2.scoreAgainst += m.score1;
+                if (m.score1 > m.score2) { team1.wins++; team2.losses++; } else { team2.wins++; team1.losses++; }
+            });
+        });
+        return Array.from(teamStatsMap.values()).map(stat => ({
+            ...stat,
+            tournaments: stat.tournaments.size
+        })).sort((a, b) => b.wins - a.wins || (b.scoreFor - b.scoreAgainst) - (a.scoreFor - a.scoreAgainst));
+    };
 
     const renderOverallStatsScreen = () => {
         const stats = calculateOverallStats();
+        const teamStats = calculateOverallTeamStats();
         const container = document.getElementById('overall-stats-container');
-        container.innerHTML = `<table class="w-full text-sm text-left">
+        let html = `<table class="w-full text-sm text-left">
             <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                 <tr>
                     <th class="px-2 py-3">Hráč</th><th class="px-2 py-3 text-center" title="Odehrané turnaje">T</th><th class="px-2 py-3 text-center" title="Odehrané zápasy">Z</th><th class="px-2 py-3 text-center" title="Výhry">V</th><th class="px-2 py-3 text-center" title="Prohry">P</th><th class="px-2 py-3 text-center" title="Celkové skóre">Skóre</th><th class="px-2 py-3 text-center">🏆</th><th class="px-2 py-3 text-center">🥈</th><th class="px-2 py-3 text-center">🥉</th>
@@ -775,6 +1058,22 @@ document.addEventListener('DOMContentLoaded', () => {
             </thead>
             <tbody>${stats.map(s => `<tr class="bg-white border-b"><td class="px-2 py-4 font-semibold">${s.player.name}</td><td class="px-2 py-4 text-center">${s.tournaments}</td><td class="px-2 py-4 text-center">${s.matches}</td><td class="px-2 py-4 text-center text-green-600">${s.wins}</td><td class="px-2 py-4 text-center text-red-600">${s.losses}</td><td class="px-2 py-4 text-center">${s.scoreFor}:${s.scoreAgainst}</td><td class="px-2 py-4 text-center">${s.places[1]}</td><td class="px-2 py-4 text-center">${s.places[2]}</td><td class="px-2 py-4 text-center">${s.places[3]}</td></tr>`).join('')}</tbody>
         </table>`;
+        if (teamStats.length) {
+            html += `<div class="mt-6">
+                <h2 class="text-lg font-semibold mb-2">Týmy (všechny turnaje)</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th class="px-2 py-3">Tým</th><th class="px-2 py-3 text-center">Turnaje</th><th class="px-2 py-3 text-center">Z</th><th class="px-2 py-3 text-center">V</th><th class="px-2 py-3 text-center">P</th><th class="px-2 py-3 text-center">Skóre</th>
+                            </tr>
+                        </thead>
+                        <tbody>${teamStats.map(s => `<tr class="bg-white border-b"><td class="px-2 py-3 font-semibold">${s.label}</td><td class="px-2 py-3 text-center">${s.tournaments}</td><td class="px-2 py-3 text-center">${s.matches}</td><td class="px-2 py-3 text-center text-green-600">${s.wins}</td><td class="px-2 py-3 text-center text-red-500">${s.losses}</td><td class="px-2 py-3 text-center">${s.scoreFor}:${s.scoreAgainst}</td></tr>`).join('')}</tbody>
+                    </table>
+                </div>
+            </div>`;
+        }
+        container.innerHTML = html;
         showScreen('overallStats');
     };
 
@@ -807,17 +1106,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderPlayerDbScreen();
             }
         },
-        'show-new-tournament-modal':()=>{tempPlayerIds=[];const defaultName = `Turnaj ${new Date().toLocaleDateString('cs-CZ')}`; const renderAddedPlayers=()=>{document.getElementById('new-players-list').innerHTML=tempPlayerIds.map((id,index)=>{const player=getGlobalPlayer(id);return`<div class="flex items-center gap-2 bg-gray-100 p-2 rounded-md"><div class="w-5 h-5 rounded-full ${playerColors[index%playerColors.length]}"></div><span class="flex-grow">${player.name}</span><button data-action="remove-temp-player" data-id="${id}" class="text-red-500 font-bold">&times;</button></div>`}).join('')||`<div class="text-sm text-gray-500 text-center p-2">Zatím žádní hráči</div>`;document.getElementById('player-count-text').textContent=`Hráči (${tempPlayerIds.length}/8)`;};openModal(`<div id="new-tournament-modal" class="modal-backdrop"><div class="modal-content space-y-4"><div class="flex justify-between items-center"><h2 class="text-xl font-bold">Nový turnaj</h2><button data-action="close-modal" class="text-gray-400 text-2xl hover:text-gray-700">&times;</button></div><div><label class="text-sm font-medium">Název turnaje</label><input id="new-tournament-name" type="text" value="${defaultName}" class="w-full mt-1 p-2 border rounded-md"></div><div><label class="text-sm font-medium">Typ setu</label><div class="flex gap-2 mt-1"> <label class="flex-1 p-3 border rounded-md cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 text-center"><input type="radio" name="points-to-win" value="11" class="sr-only" checked><span>Malý set (11)</span></label> <label class="flex-1 p-3 border rounded-md cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 text-center"><input type="radio" name="points-to-win" value="21" class="sr-only"><span>Velký set (21)</span></label></div></div><div><label id="player-count-text" class="text-sm font-medium">Hráči (0/8)</label><div id="new-players-list" class="space-y-2 my-2">${tempPlayerIds.length>0?'':'<div class="text-sm text-gray-500 text-center p-2">Zatím žádní hráči</div>'}</div><div class="relative"><input id="add-player-input" type="text" placeholder="Napište jméno pro přidání..." class="w-full p-2 border rounded-md"><div id="autocomplete-container"></div></div></div><button data-action="create-tournament" class="btn btn-primary w-full">Vytvořit turnaj</button></div></div>`);setupAutocomplete('add-player-input','autocomplete-container',(id)=>{if(tempPlayerIds.length<8&&!tempPlayerIds.includes(id)){tempPlayerIds.push(id);renderAddedPlayers();}},tempPlayerIds);document.getElementById('add-player-input').focus();document.getElementById('new-tournament-modal').addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); document.querySelector('[data-action="create-tournament"]').click(); } });},
-        'remove-temp-player':(target)=>{const idToRemove=parseInt(target.dataset.id);tempPlayerIds=tempPlayerIds.filter(id=>id!==idToRemove);const renderAddedPlayers=()=>{document.getElementById('new-players-list').innerHTML=tempPlayerIds.map((id,index)=>{const player=getGlobalPlayer(id);return`<div class="flex items-center gap-2 bg-gray-100 p-2 rounded-md"><div class="w-5 h-5 rounded-full ${playerColors[index%playerColors.length]}"></div><span class="flex-grow">${player.name}</span><button data-action="remove-temp-player" data-id="${id}" class="text-red-500 font-bold">&times;</button></div>`}).join('')||`<div class="text-sm text-gray-500 text-center p-2">Zatím žádní hráči</div>`;document.getElementById('player-count-text').textContent=`Hráči (${tempPlayerIds.length}/8)`;};renderAddedPlayers();},
+        'show-new-tournament-modal':()=>{tempPlayerIds=[];tempTournamentType=TOURNAMENT_TYPES.SINGLE;const defaultName = `Turnaj ${new Date().toLocaleDateString('cs-CZ')}`; const renderAddedPlayers=()=>{const list=document.getElementById('new-players-list');if(list){list.innerHTML=tempPlayerIds.map((id,index)=>{const player=getGlobalPlayer(id);return`<div class="flex items-center gap-2 bg-gray-100 p-2 rounded-md"><div class="w-5 h-5 rounded-full ${playerColors[index%playerColors.length]}"></div><span class="flex-grow">${player.name}</span><button data-action="remove-temp-player" data-id="${id}" class="text-red-500 font-bold">&times;</button></div>`}).join('')||`<div class="text-sm text-gray-500 text-center p-2">Zatím žádní hráči</div>`;}const countLabel=document.getElementById('player-count-text');if(countLabel){countLabel.textContent=`Hráči (${tempPlayerIds.length}/${getPlayerLimitForType(tempTournamentType)})`;const note=document.getElementById('player-count-note');if(note){note.textContent=tempTournamentType===TOURNAMENT_TYPES.DOUBLE&&tempPlayerIds.length%2!==0?'Čtyřhra vyžaduje sudý počet hráčů.':'';}}};const renderTypeToggle=()=>{document.querySelectorAll('[data-tournament-type]').forEach(btn=>{const isActive=btn.dataset.tournamentType===tempTournamentType;btn.classList.toggle('bg-blue-500',isActive);btn.classList.toggle('text-white',isActive);btn.classList.toggle('border-blue-500',isActive);btn.classList.toggle('bg-gray-100',!isActive);btn.classList.toggle('text-gray-700',!isActive);});const hint=document.getElementById('tournament-type-hint');if(hint){hint.textContent=tempTournamentType===TOURNAMENT_TYPES.DOUBLE?'Čtyřhra vyžaduje 4–16 hráčů a sudý počet (týmy po dvou).':'Dvouhra vyžaduje 2–8 hráčů.';}};openModal(`<div id="new-tournament-modal" class="modal-backdrop"><div class="modal-content space-y-4"><div class="flex justify-between items-center"><h2 class="text-xl font-bold">Nový turnaj</h2><button data-action="close-modal" class="text-gray-400 text-2xl hover:text-gray-700">&times;</button></div><div><label class="text-sm font-medium">Název turnaje</label><input id="new-tournament-name" type="text" value="${defaultName}" class="w-full mt-1 p-2 border rounded-md"></div><div><label class="text-sm font-medium">Typ zápasu</label><div class="flex gap-2 mt-1"><button type="button" data-tournament-type="single" class="flex-1 p-3 border rounded-md text-center">Dvouhra</button><button type="button" data-tournament-type="double" class="flex-1 p-3 border rounded-md text-center">Čtyřhra</button></div><p class="text-xs text-gray-500 mt-1" id="tournament-type-hint"></p></div><div><label class="text-sm font-medium">Typ setu</label><div class="flex gap-2 mt-1"> <label class="flex-1 p-3 border rounded-md cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 text-center"><input type="radio" name="points-to-win" value="11" class="sr-only" checked><span>Malý set (11)</span></label> <label class="flex-1 p-3 border rounded-md cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 text-center"><input type="radio" name="points-to-win" value="21" class="sr-only"><span>Velký set (21)</span></label></div></div><div><label id="player-count-text" class="text-sm font-medium">Hráči (0/${getPlayerLimitForType(tempTournamentType)})</label><div id="new-players-list" class="space-y-2 my-2">${tempPlayerIds.length>0?'':'<div class="text-sm text-gray-500 text-center p-2">Zatím žádní hráči</div>'}</div><p id="player-count-note" class="text-xs text-red-500"></p><div class="relative"><input id="add-player-input" type="text" placeholder="Napište jméno pro přidání..." class="w-full p-2 border rounded-md"><div id="autocomplete-container"></div></div></div><button data-action="create-tournament" class="btn btn-primary w-full">Vytvořit turnaj</button></div></div>`);setupAutocomplete('add-player-input','autocomplete-container',(id)=>{const maxPlayers=getPlayerLimitForType(tempTournamentType);if(tempPlayerIds.length<maxPlayers&&!tempPlayerIds.includes(id)){tempPlayerIds.push(id);renderAddedPlayers();}else if(tempPlayerIds.includes(id)){alert('Hráč je již v seznamu.');}else{alert(`Maximální počet hráčů pro tento formát je ${maxPlayers}.`);}},tempPlayerIds);document.querySelectorAll('[data-tournament-type]').forEach(btn=>{btn.addEventListener('click',()=>{const selectedType=btn.dataset.tournamentType;const maxPlayers=getPlayerLimitForType(selectedType);if(tempPlayerIds.length>maxPlayers){alert(`Pro tento formát je povoleno maximálně ${maxPlayers} hráčů. Nejprve hráče odeberte.`);return;}tempTournamentType=selectedType;renderTypeToggle();renderAddedPlayers();});});renderTypeToggle();renderAddedPlayers();document.getElementById('add-player-input').focus();document.getElementById('new-tournament-modal').addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); document.querySelector('[data-action="create-tournament"]').click(); } });},
+        'remove-temp-player':(target)=>{const idToRemove=parseInt(target.dataset.id);tempPlayerIds=tempPlayerIds.filter(id=>id!==idToRemove);const list=document.getElementById('new-players-list');if(list){list.innerHTML=tempPlayerIds.map((id,index)=>{const player=getGlobalPlayer(id);return`<div class="flex items-center gap-2 bg-gray-100 p-2 rounded-md"><div class="w-5 h-5 rounded-full ${playerColors[index%playerColors.length]}"></div><span class="flex-grow">${player.name}</span><button data-action="remove-temp-player" data-id="${id}" class="text-red-500 font-bold">&times;</button></div>`}).join('')||`<div class="text-sm text-gray-500 text-center p-2">Zatím žádní hráči</div>`;const countLabel=document.getElementById('player-count-text');if(countLabel){countLabel.textContent=`Hráči (${tempPlayerIds.length}/${getPlayerLimitForType(tempTournamentType)})`;const note=document.getElementById('player-count-note');if(note){note.textContent=tempTournamentType===TOURNAMENT_TYPES.DOUBLE&&tempPlayerIds.length%2!==0?'Čtyřhra vyžaduje sudý počet hráčů.':'';}}}},
         'create-tournament': async () => {
             const name = document.getElementById('new-tournament-name').value.trim();
-            if (!name || tempPlayerIds.length < 2) {
-                alert('Zadejte název a alespoň 2 hráče.');
+            const minPlayers = getMinPlayersForType(tempTournamentType);
+            const maxPlayers = getPlayerLimitForType(tempTournamentType);
+            if (!name) {
+                alert('Zadejte název turnaje.');
                 return;
             }
-            // Zkontrolujeme a upravíme název, pokud už existuje
+            if (tempPlayerIds.length < minPlayers) {
+                alert(`Pro tento formát je potřeba alespoň ${minPlayers} hráčů.`);
+                return;
+            }
+            if (tempTournamentType === TOURNAMENT_TYPES.DOUBLE && tempPlayerIds.length % 2 !== 0) {
+                alert('Čtyřhra vyžaduje sudý počet hráčů.');
+                return;
+            }
+            if (tempPlayerIds.length > maxPlayers) {
+                alert(`Maximální počet hráčů je ${maxPlayers}.`);
+                return;
+            }
             const uniqueName = generateUniqueTournamentName(name);
-            // Formát data pro MySQL: YYYY-MM-DD HH:MM:SS
             const now = new Date();
             const mysqlDate = now.getFullYear() + '-' + 
                 String(now.getMonth() + 1).padStart(2, '0') + '-' + 
@@ -829,7 +1140,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 name: uniqueName,
                 pointsToWin: parseInt(document.querySelector('input[name="points-to-win"]:checked').value),
                 createdAt: mysqlDate,
-                playerIds: tempPlayerIds
+                playerIds: tempPlayerIds,
+                type: tempTournamentType
             };
             
             await apiCall('createTournament', payload);
@@ -837,8 +1149,8 @@ document.addEventListener('DOMContentLoaded', () => {
             closeModal();
             renderMainScreen();
         },
-        'show-settings-modal':()=>{const t=getTournament();tempPlayerIds=[...t.playerIds];const renderAddedPlayers=()=>{const list=document.getElementById('settings-players-list');if(list){list.innerHTML=tempPlayerIds.map((id,index)=>{const player=getGlobalPlayer(id);const hasActivity=t.matches.some(m=>(m.completed||m.score1>0||m.score2>0)&&(m.player1Id===id||m.player2Id===id));return`<div class="flex items-center gap-2 bg-gray-100 p-2 rounded-md"><div class="w-6 h-6 ${playerColors[index%playerColors.length]} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">${player.name.charAt(0).toUpperCase()}</div><span class="flex-grow">${player.name}</span><button data-action="remove-player-settings" data-id="${id}" class="text-red-500 font-bold text-xl disabled:opacity-25" ${hasActivity?'disabled title="Hráč již má odehraný nebo rozehraný zápas"':''}>&times;</button></div>`}).join('')||`<div class="text-sm text-gray-500 text-center p-2">Žádní hráči</div>`;document.getElementById('settings-player-count').textContent=`Hráči (${tempPlayerIds.length}/8)`;}};openModal(`<div id="settings-modal" class="modal-backdrop"><div class="modal-content space-y-4"><div class="flex justify-between items-center"><h2 class="text-xl font-bold">Nastavení turnaje</h2><button data-action="close-modal" class="text-gray-400 text-2xl hover:text-gray-700">&times;</button></div><div><label class="text-sm font-medium">Název turnaje</label><input id="edit-tournament-name" value="${t.name}" class="w-full mt-1 p-2 border rounded-md" ${t.isLocked?'disabled':''}></div><div><label id="settings-player-count" class="text-sm font-medium">Hráči</label><div id="settings-players-list" class="space-y-2 my-2"></div><div class="relative"${t.isLocked?'hidden':''}><input id="add-player-input-settings" type="text" placeholder="Přidat dalšího hráče..." class="w-full p-2 border rounded-md"><div id="autocomplete-container-settings"></div></div></div><button data-action="save-settings" class="btn btn-primary w-full">Uložit změny</button><div class="border-t pt-4 mt-4 space-y-2"><label class="text-sm font-medium text-gray-500">Servisní akce</label><div class="flex gap-2 flex-wrap"><button data-action="copy-tournament" class="btn btn-secondary w-full text-sm"><i class="fa-solid fa-copy"></i> Kopírovat turnaj</button><button data-action="toggle-lock-settings" class="btn btn-secondary w-full text-sm">${t.isLocked?'🔓 Odemknout':'🔒 Zamknout'}</button><button data-action="delete-tournament-settings" class="btn btn-danger w-full text-sm">Smazat turnaj</button></div></div></div></div>`);renderAddedPlayers();setupAutocomplete('add-player-input-settings','autocomplete-container-settings',(id)=>{if(tempPlayerIds.length<8&&!tempPlayerIds.includes(id)){tempPlayerIds.push(id);renderAddedPlayers();}},tempPlayerIds);document.getElementById('settings-modal').addEventListener('keydown',(e)=>{if(e.key==='Enter'&&e.ctrlKey){e.preventDefault();document.querySelector('[data-action="save-settings"]').click();}});},
-        'remove-player-settings':(target)=>{const idToRemove=parseInt(target.dataset.id);tempPlayerIds=tempPlayerIds.filter(id=>id!==idToRemove);const t=getTournament();const renderAddedPlayers=()=>{const list=document.getElementById('settings-players-list');if(list){list.innerHTML=tempPlayerIds.map((id,index)=>{const player=getGlobalPlayer(id);const hasActivity=t.matches.some(m=>(m.completed||m.score1>0||m.score2>0)&&(m.player1Id===id||m.player2Id===id));return`<div class="flex items-center gap-2 bg-gray-100 p-2 rounded-md"><div class="w-6 h-6 ${playerColors[index%playerColors.length]} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">${player.name.charAt(0).toUpperCase()}</div><span class="flex-grow">${player.name}</span><button data-action="remove-player-settings" data-id="${id}" class="text-red-500 font-bold text-xl disabled:opacity-25" ${hasActivity?'disabled title="Hráč již má odehraný nebo rozehraný zápas"':''}>&times;</button></div>`}).join('')||`<div class="text-sm text-gray-500 text-center p-2">Žádní hráči</div>`;document.getElementById('settings-player-count').textContent=`Hráči (${tempPlayerIds.length}/8)`;}};renderAddedPlayers();},
+        'show-settings-modal':()=>{const t=getTournament();const maxPlayersForTournament=getPlayerLimitForType(t.type||TOURNAMENT_TYPES.SINGLE);const matchIncludesPlayer=(match,playerId)=>{return getSidePlayerIds(t,match,1).includes(playerId)||getSidePlayerIds(t,match,2).includes(playerId);};tempPlayerIds=[...t.playerIds];const renderAddedPlayers=()=>{const list=document.getElementById('settings-players-list');if(list){list.innerHTML=tempPlayerIds.map((id,index)=>{const player=getGlobalPlayer(id);const hasActivity=t.matches.some(m=>(m.completed||m.score1>0||m.score2>0)&&matchIncludesPlayer(m,id));return`<div class="flex items-center gap-2 bg-gray-100 p-2 rounded-md"><div class="w-6 h-6 ${playerColors[index%playerColors.length]} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">${player.name.charAt(0).toUpperCase()}</div><span class="flex-grow">${player.name}</span><button data-action="remove-player-settings" data-id="${id}" class="text-red-500 font-bold text-xl disabled:opacity-25" ${hasActivity?'disabled title="Hráč již má odehraný nebo rozehraný zápas"':''}>&times;</button></div>`}).join('')||`<div class="text-sm text-gray-500 text-center p-2">Žádní hráči</div>`;document.getElementById('settings-player-count').textContent=`Hráči (${tempPlayerIds.length}/${maxPlayersForTournament})`;}};openModal(`<div id="settings-modal" class="modal-backdrop"><div class="modal-content space-y-4"><div class="flex justify-between items-center"><h2 class="text-xl font-bold">Nastavení turnaje</h2><button data-action="close-modal" class="text-gray-400 text-2xl hover:text-gray-700">&times;</button></div><p class="text-sm text-gray-500">Formát: ${getTournamentTypeLabel(t)}</p><div><label class="text-sm font-medium">Název turnaje</label><input id="edit-tournament-name" value="${t.name}" class="w-full mt-1 p-2 border rounded-md" ${t.isLocked?'disabled':''}></div><div><label id="settings-player-count" class="text-sm font-medium">Hráči</label><div id="settings-players-list" class="space-y-2 my-2"></div><div class="relative"${t.isLocked?'hidden':''}><input id="add-player-input-settings" type="text" placeholder="Přidat dalšího hráče..." class="w-full p-2 border rounded-md"><div id="autocomplete-container-settings"></div></div></div><button data-action="save-settings" class="btn btn-primary w-full">Uložit změny</button><div class="border-t pt-4 mt-4 space-y-2"><label class="text-sm font-medium text-gray-500">Servisní akce</label><div class="flex gap-2 flex-wrap"><button data-action="copy-tournament" class="btn btn-secondary w-full text-sm"><i class="fa-solid fa-copy"></i> Kopírovat turnaj</button><button data-action="toggle-lock-settings" class="btn btn-secondary w-full text-sm">${t.isLocked?'🔓 Odemknout':'🔒 Zamknout'}</button><button data-action="delete-tournament-settings" class="btn btn-danger w-full text-sm">Smazat turnaj</button></div></div></div></div>`);renderAddedPlayers();setupAutocomplete('add-player-input-settings','autocomplete-container-settings',(id)=>{if(tempPlayerIds.length<maxPlayersForTournament&&!tempPlayerIds.includes(id)){tempPlayerIds.push(id);renderAddedPlayers();}},tempPlayerIds);document.getElementById('settings-modal').addEventListener('keydown',(e)=>{if(e.key==='Enter'&&e.ctrlKey){e.preventDefault();document.querySelector('[data-action="save-settings"]').click();}});},
+        'remove-player-settings':(target)=>{const idToRemove=parseInt(target.dataset.id);tempPlayerIds=tempPlayerIds.filter(id=>id!==idToRemove);const t=getTournament();const maxPlayersForTournament=getPlayerLimitForType(t.type||TOURNAMENT_TYPES.SINGLE);const matchIncludesPlayer=(match,playerId)=>{return getSidePlayerIds(t,match,1).includes(playerId)||getSidePlayerIds(t,match,2).includes(playerId);};const renderAddedPlayers=()=>{const list=document.getElementById('settings-players-list');if(list){list.innerHTML=tempPlayerIds.map((id,index)=>{const player=getGlobalPlayer(id);const hasActivity=t.matches.some(m=>(m.completed||m.score1>0||m.score2>0)&&matchIncludesPlayer(m,id));return`<div class="flex items-center gap-2 bg-gray-100 p-2 rounded-md"><div class="w-6 h-6 ${playerColors[index%playerColors.length]} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">${player.name.charAt(0).toUpperCase()}</div><span class="flex-grow">${player.name}</span><button data-action="remove-player-settings" data-id="${id}" class="text-red-500 font-bold text-xl disabled:opacity-25" ${hasActivity?'disabled title="Hráč již má odehraný nebo rozehraný zápas"':''}>&times;</button></div>`}).join('')||`<div class="text-sm text-gray-500 text-center p-2">Žádní hráči</div>`;document.getElementById('settings-player-count').textContent=`Hráči (${tempPlayerIds.length}/${maxPlayersForTournament})`;}};renderAddedPlayers();},
         'save-settings': async () => {
             const t = getTournament();
             if (t.isLocked) { closeModal(); return; }
@@ -846,13 +1158,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const originalPlayerIds = [...t.playerIds];
             t.name = document.getElementById('edit-tournament-name').value.trim() || t.name;
             t.playerIds = tempPlayerIds;
+            const minPlayers = getMinPlayersForType(t.type || TOURNAMENT_TYPES.SINGLE);
+            const maxPlayers = getPlayerLimitForType(t.type || TOURNAMENT_TYPES.SINGLE);
+            if (t.playerIds.length < minPlayers) {
+                alert(`Minimální počet hráčů pro tento formát je ${minPlayers}.`);
+                return;
+            }
+            if (isDoubleTournament(t) && t.playerIds.length % 2 !== 0) {
+                alert('Čtyřhra vyžaduje sudý počet hráčů.');
+                return;
+            }
+            if (t.playerIds.length > maxPlayers) {
+                alert(`Maximální počet hráčů je ${maxPlayers}.`);
+                return;
+            }
 
             // Zjistíme, jestli se změnili hráči, abychom věděli, zda přegenerovat zápasy
             const playersChanged = originalPlayerIds.length !== t.playerIds.length || originalPlayerIds.some(id => !t.playerIds.includes(id));
 
             if (playersChanged) {
                  // Odebereme zápasy s hráči, kteří již nejsou v turnaji
-                t.matches = t.matches.filter(m => t.playerIds.includes(m.player1Id) && t.playerIds.includes(m.player2Id));
+                t.matches = t.matches.filter(m => {
+                    const participants = [...getSidePlayerIds(t, m, 1), ...getSidePlayerIds(t, m, 2)];
+                    return participants.every(id => t.playerIds.includes(id));
+                });
                 // Dle nové logiky API přegeneruje zápasy na backendu
             }
             
@@ -927,7 +1256,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 name: newName,
                 pointsToWin: currentTournament.pointsToWin,
                 createdAt: mysqlDate,
-                playerIds: [...currentTournament.playerIds]
+                playerIds: [...currentTournament.playerIds],
+                type: currentTournament.type || TOURNAMENT_TYPES.SINGLE
             };
             
             let newTournament = null;
@@ -986,18 +1316,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (newTournament) {
                 // Pro každý zápas nastavíme sides_swapped = true
                 for (const match of newTournament.matches) {
-                    // Použijeme hodnoty z nového zápasu a nastavíme sidesSwapped na true
                     const matchPayload = {
                         tournament_id: parseInt(newTournament.id),
                         player1Id: match.player1Id || match.player1_id,
                         player2Id: match.player2Id || match.player2_id,
+                        team1Id: match.team1Id || match.team1_id || null,
+                        team2Id: match.team2Id || match.team2_id || null,
                         score1: match.score1 || 0,
                         score2: match.score2 || 0,
                         completed: match.completed || 0,
                         firstServer: match.firstServer || match.first_server || null,
                         servingPlayer: match.servingPlayer || match.serving_player || null,
                         match_order: newTournament.matches.findIndex(m => m.id == match.id),
-                        sidesSwapped: true
+                        sidesSwapped: true,
+                        doubleRotationState: match.doubleRotationState || match.double_rotation_state || null
                     };
                     try {
                         await apiCall('updateMatch', { id: match.id, data: matchPayload });
@@ -1058,9 +1390,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const selectedPlayerId = parseInt(target.dataset.playerId);
-            m.firstServer = (selectedPlayerId === m.player1Id) ? 1 : 2;
-            m.servingPlayer = selectedPlayerId;
+            const teamSide = target.dataset.teamSide ? parseInt(target.dataset.teamSide, 10) : null;
+            if (teamSide && isDoubleTournament(t)) {
+                m.firstServer = teamSide;
+                initializeDoubleRotationState(t, m, teamSide);
+            } else {
+                const selectedPlayerId = parseInt(target.dataset.playerId, 10);
+                m.firstServer = (selectedPlayerId === m.player1Id) ? 1 : 2;
+                m.servingPlayer = selectedPlayerId;
+                m.doubleRotationState = null;
+            }
             
             const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
             await apiCall('updateMatch', { id: m.id, data: matchPayload });
@@ -1068,8 +1407,12 @@ document.addEventListener('DOMContentLoaded', () => {
             closeModal();
             renderGameBoard();
         },
-        'add-point': (target) => updateScore(parseInt(target.dataset.playerId), 1),
-        'subtract-point': (target) => { event.stopPropagation(); updateScore(parseInt(target.dataset.playerId), -1); },
+        'add-point': (target) => {
+            const playerId = target.dataset.playerId ? parseInt(target.dataset.playerId) : null;
+            const side = target.dataset.side ? parseInt(target.dataset.side) : null;
+            updateScore(playerId, 1, side);
+        },
+        'subtract-point': (_, evt) => { evt?.stopPropagation(); undoLastPoint(); },
         'undo-last-point': undoLastPoint,
         'suspend-match':()=>{renderTournamentScreen();}, // Pouze se vrací, není třeba ukládat
         'save-match-result': async () => {
@@ -1087,7 +1430,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 openModal(`<div id="post-match-modal" class="modal-backdrop"><div class="modal-content modal-lg space-y-4"><h2 class="text-xl font-bold text-center">Průběžné pořadí</h2>${templates.leaderboardTable(calculateStats(t),t)}<button data-action="close-and-refresh" class="btn btn-primary w-full">Pokračovat</button></div></div>`);
             }
         },
-        'edit-match':(target)=>{const t=getTournament();const m=getMatch(t,target.dataset.id);const p1=getGlobalPlayer(m.player1Id);const p2=getGlobalPlayer(m.player2Id);openModal(`<div id="edit-match-modal" class="modal-backdrop"><div class="modal-content space-y-4"><h2 class="text-xl font-bold">Úprava výsledku</h2><div class="flex items-center justify-between gap-2"><span class="font-bold">${p1.name}</span><input id="edit-score1" type="number" value="${m.score1}" class="w-20 text-center text-xl p-2 border rounded"><span class="text-xl">:</span><input id="edit-score2" type="number" value="${m.score2}" class="w-20 text-center text-xl p-2 border rounded"><span class="font-bold">${p2.name}</span></div><div class="flex gap-2"><button data-action="close-modal" class="btn btn-secondary w-full">Zrušit</button><button data-action="save-edited-match" data-match-id="${m.id}" class="btn btn-primary w-full">Uložit</button></div></div></div>`);document.getElementById('edit-match-modal').addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); document.querySelector('[data-action="save-edited-match"]').click(); } });},
+        'edit-match':(target)=>{const t=getTournament();const m=getMatch(t,target.dataset.id);const team1Label=formatPlayersLabel(getSidePlayerIds(t,m,1));const team2Label=formatPlayersLabel(getSidePlayerIds(t,m,2));openModal(`<div id="edit-match-modal" class="modal-backdrop"><div class="modal-content space-y-4"><h2 class="text-xl font-bold">Úprava výsledku</h2><div class="flex items-center justify-between gap-2"><span class="font-bold">${team1Label}</span><input id="edit-score1" type="number" value="${m.score1}" class="w-20 text-center text-xl p-2 border rounded"><span class="text-xl">:</span><input id="edit-score2" type="number" value="${m.score2}" class="w-20 text-center text-xl p-2 border rounded"><span class="font-bold">${team2Label}</span></div><div class="flex gap-2"><button data-action="close-modal" class="btn btn-secondary w-full">Zrušit</button><button data-action="save-edited-match" data-match-id="${m.id}" class="btn btn-primary w-full">Uložit</button></div></div></div>`);document.getElementById('edit-match-modal').addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); document.querySelector('[data-action="save-edited-match"]').click(); } });},
         'save-edited-match': async (target) => {
             const t = getTournament();
             const matchId = target.dataset.matchId;
@@ -1178,7 +1521,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!e.target.closest('#settings-menu') && !e.target.closest('[data-action="toggle-settings-menu"]')) {
             document.getElementById('settings-menu').classList.add('hidden');
         }
-        if (target && allActions[target.dataset.action]) allActions[target.dataset.action](target); 
+        if (target && allActions[target.dataset.action]) allActions[target.dataset.action](target, e); 
     });
     app.addEventListener('change', (e) => {
         const soundToggle = e.target.closest('[data-action="toggle-sound"]');
@@ -1244,20 +1587,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const m = getMatch(t, state.activeMatchId);
             
             if (m && !m.completed) {
-                const winnerId = checkWinCondition(m, t.pointsToWin);
-                if (!winnerId) {
-                    // Aplikujeme sideswap pro zobrazení
-                    const originalP1 = getGlobalPlayer(m.player1Id);
-                    const originalP2 = getGlobalPlayer(m.player2Id);
-                    const p1 = m.sidesSwapped ? originalP2 : originalP1;
-                    const p2 = m.sidesSwapped ? originalP1 : originalP2;
-                    
+                const winnerSide = checkWinCondition(m, t.pointsToWin);
+                if (!winnerSide) {
+                    const leftRawSide = m.sidesSwapped ? 2 : 1;
+                    const rightRawSide = m.sidesSwapped ? 1 : 2;
                     if (e.key === 'ArrowLeft') {
                         e.preventDefault();
-                        updateScore(p1.id, 1);
+                        updateScore(null, 1, leftRawSide);
                     } else if (e.key === 'ArrowRight') {
                         e.preventDefault();
-                        updateScore(p2.id, 1);
+                        updateScore(null, 1, rightRawSide);
                     }
                 } else {
                     // Po vítězství: šipka vlevo = Zpět, šipka vpravo = Uložit výsledek
@@ -1344,24 +1683,34 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderGameBoard() {
         const t = getTournament(); 
         const m = getMatch(t, state.activeMatchId); 
-        
-        const originalP1 = getGlobalPlayer(m.player1Id);
-        const originalP2 = getGlobalPlayer(m.player2Id);
-        
-        // Apply sideswap for display
-        const p1 = m.sidesSwapped ? originalP2 : originalP1;
-        const p2 = m.sidesSwapped ? originalP1 : originalP2;
-        const s1 = m.sidesSwapped ? m.score2 : m.score1;
-        const s2 = m.sidesSwapped ? m.score1 : m.score2;
+        const sides = getDisplaySides(t, m);
+        const rawSidePlayers = {
+            1: getSidePlayerIds(t, m, 1),
+            2: getSidePlayerIds(t, m, 2)
+        };
+        const leftRawSide = m.sidesSwapped ? 2 : 1;
+        const rightRawSide = m.sidesSwapped ? 1 : 2;
+        const leftScore = m.sidesSwapped ? m.score2 : m.score1;
+        const rightScore = m.sidesSwapped ? m.score1 : m.score2;
+        const winnerSide = checkWinCondition(m, t.pointsToWin);
+        const canAddPoints = !winnerSide;
+        const servingRawSide = rawSidePlayers[1].includes(m.servingPlayer) ? 1 : (rawSidePlayers[2].includes(m.servingPlayer) ? 2 : null);
+        const servingLabel = m.servingPlayer
+            ? (isDoubleTournament(t)
+                ? formatPlayersLabel(servingRawSide === 1 ? rawSidePlayers[1] : rawSidePlayers[2])
+                : (getGlobalPlayer(m.servingPlayer)?.name || '...'))
+            : '...';
 
-        const winnerId = checkWinCondition(m, t.pointsToWin);
-        const canAddPoints = !winnerId;
-
-        const servingPlayerName = m.servingPlayer ? getGlobalPlayer(m.servingPlayer).name : '...';
-        
-        // Použijeme barvy podle pořadí hráče v turnaji
-        const p1Color = playerColors[t.playerIds.indexOf(p1.id) % playerColors.length];
-        const p2Color = playerColors[t.playerIds.indexOf(p2.id) % playerColors.length];
+        const makeScoreBox = (sideDescriptor, currentScore, rawSide) => `
+            <div ${canAddPoints ? `data-action="add-point" data-side="${rawSide}"` : ''} class="player-score-box ${sideDescriptor.colorClass} p-2 md:p-4 text-white relative flex flex-col items-center justify-center flex-1 w-1/2 h-full ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
+                ${sideDescriptor.playerIds.includes(m.servingPlayer) ? `<div class="absolute top-2 left-2 md:top-4 md:left-4 w-8 h-8 md:w-10 md:h-10 rounded-full bg-yellow-400/90 text-xl md:text-2xl flex items-center justify-center">🏓</div>` : ''}
+                <button data-action="subtract-point" class="absolute top-2 right-2 md:top-4 md:right-4 w-10 h-10 md:w-12 md:h-12 bg-black/20 rounded-full text-xl md:text-2xl">-1</button>
+                <div class="text-xl md:text-2xl lg:text-3xl font-bold text-center">${sideDescriptor.label}</div>
+                ${isDoubleTournament(t) ? `<div class="text-xs md:text-sm opacity-90">${sideDescriptor.playerIds.map(id => getGlobalPlayer(id)?.name || '???').join(' • ')}</div>` : ''}
+                <div class="text-7xl md:text-8xl lg:text-9xl font-extrabold my-2 md:my-4">${currentScore}</div>
+                <div class="text-xs md:text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div>
+            </div>
+        `;
 
         renderGameScreen(`
             <div class="h-screen flex flex-col w-full">
@@ -1369,7 +1718,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button data-action="back-to-tournament" class="btn btn-secondary !p-1 md:!p-2 text-sm md:text-base w-20 md:w-24">Přerušit</button>
                     <div class="flex-grow px-2">
                         <p class="text-xs md:text-sm text-gray-500">Hraje se na ${t.pointsToWin} bodů</p>
-                        <p class="text-sm md:text-base font-semibold">Podání: ${servingPlayerName}</p>
+                        <p class="text-sm md:text-base font-semibold">Podání: ${servingLabel}</p>
                     </div>
                     <div class="w-20 md:w-24 flex justify-end gap-1 md:gap-2">
                         <button data-action="toggle-voice-assist-ingame" class="btn btn-secondary !p-0 h-8 w-8 md:h-10 md:w-10 text-base md:text-lg" title="Zapnout/vypnout hlas">${state.settings.voiceAssistEnabled ? '<i class="fa-solid fa-comment-dots"></i>' : '<i class="fa-solid fa-comment-slash"></i>'}</button>
@@ -1377,31 +1726,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </header>
                 <div class="flex-1 flex flex-row w-full min-h-0">
-                    <div ${canAddPoints ? `data-action="add-point" data-player-id="${p1.id}"` : ''} class="player-score-box ${p1Color} p-2 md:p-4 text-white relative flex flex-col items-center justify-center flex-1 w-1/2 h-full ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
-                        ${m.servingPlayer === p1.id ? `<div class="absolute top-2 left-2 md:top-4 md:left-4 w-8 h-8 md:w-10 md:h-10 rounded-full bg-yellow-400/90 text-xl md:text-2xl flex items-center justify-center">🏓</div>` : ''}
-                        <button data-action="subtract-point" data-player-id="${p1.id}" class="absolute top-2 right-2 md:top-4 md:right-4 w-10 h-10 md:w-12 md:h-12 bg-black/20 rounded-full text-xl md:text-2xl">-1</button>
-                        <div class="text-xl md:text-2xl lg:text-3xl font-bold">${p1.name}</div>
-                        <div class="text-7xl md:text-8xl lg:text-9xl font-extrabold my-2 md:my-4">${s1}</div>
-                        <div class="text-xs md:text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div>
-                    </div>
-                    <div ${canAddPoints ? `data-action="add-point" data-player-id="${p2.id}"` : ''} class="player-score-box ${p2Color} p-2 md:p-4 text-white relative flex flex-col items-center justify-center flex-1 w-1/2 h-full ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
-                        ${m.servingPlayer === p2.id ? `<div class="absolute top-2 left-2 md:top-4 md:left-4 w-8 h-8 md:w-10 md:h-10 rounded-full bg-yellow-400/90 text-xl md:text-2xl flex items-center justify-center">🏓</div>` : ''}
-                        <button data-action="subtract-point" data-player-id="${p2.id}" class="absolute top-2 right-2 md:top-4 md:right-4 w-10 h-10 md:w-12 md:h-12 bg-black/20 rounded-full text-xl md:text-2xl">-1</button>
-                        <div class="text-xl md:text-2xl lg:text-3xl font-bold">${p2.name}</div>
-                        <div class="text-7xl md:text-8xl lg:text-9xl font-extrabold my-2 md:my-4">${s2}</div>
-                        <div class="text-xs md:text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div>
-                    </div>
+                    ${makeScoreBox(sides.left, leftScore, leftRawSide)}
+                    ${makeScoreBox(sides.right, rightScore, rightRawSide)}
                 </div>
-                ${winnerId ? `<div class="absolute bottom-4 left-4 right-4 bg-white p-6 rounded-xl shadow-lg text-center space-y-3 z-20"><div class="text-3xl">🏆</div><h2 class="text-2xl font-bold">Vítěz: ${getGlobalPlayer(winnerId).name}!</h2><p class="text-gray-500">Výsledek: ${m.score1} : ${m.score2}</p><div class="flex gap-2"><button data-action="undo-last-point" class="btn btn-secondary flex-1" ${state.scoreHistory.length === 0 ? 'disabled' : ''}>Zpět</button><button data-action="save-match-result" class="btn btn-primary flex-1">Uložit výsledek</button></div></div>` : ''}
+                ${winnerSide ? `<div class="absolute bottom-4 left-4 right-4 bg-white p-6 rounded-xl shadow-lg text-center space-y-3 z-20"><div class="text-3xl">🏆</div><h2 class="text-2xl font-bold">Vítěz: ${formatPlayersLabel(winnerSide === 1 ? getSidePlayerIds(t, m, 1) : getSidePlayerIds(t, m, 2))}!</h2><p class="text-gray-500">Výsledek: ${m.score1} : ${m.score2}</p><div class="flex gap-2"><button data-action="undo-last-point" class="btn btn-secondary flex-1" ${state.scoreHistory.length === 0 ? 'disabled' : ''}>Zpět</button><button data-action="save-match-result" class="btn btn-primary flex-1">Uložit výsledek</button></div></div>` : ''}
             </div>`
         );
 
-        if (winnerId) {
-            const winnerName = getGlobalPlayer(winnerId).name;
+        if (winnerSide) {
+            const winnerLabel = formatPlayersLabel(winnerSide === 1 ? getSidePlayerIds(t, m, 1) : getSidePlayerIds(t, m, 2));
             const winnerScore = Math.max(m.score1, m.score2);
             const loserScore = Math.min(m.score1, m.score2);
             const randomPhrase = winningPhrases[Math.floor(Math.random() * winningPhrases.length)];
-            speak(`Konec zápasu. Vítěz je ${winnerName} s výsledkem ${winnerScore} : ${loserScore}, ${randomPhrase}`);
+            speak(`Konec zápasu. Vítěz je ${winnerLabel} s výsledkem ${winnerScore} : ${loserScore}, ${randomPhrase}`);
         }
     };
 
@@ -1436,11 +1773,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (p1.id === p2.id) {
                     row.push('-');
                 } else {
-                    const match = t.matches.find(m => m.completed && ((m.player1Id === p1.id && m.player2Id === p2.id) || (m.player1Id === p2.id && m.player2Id === p1.id)));
+                    const match = t.matches.find(m => {
+                        const result = getMatchResultForPlayers(t, m, p1.id, p2.id);
+                        return result && m.completed;
+                    });
                     if (match) {
-                        const p1Score = match.player1Id === p1.id ? match.score1 : match.score2;
-                        const p2Score = match.player1Id === p1.id ? match.score2 : match.score1;
-                        row.push(`${p1Score}:${p2Score}`);
+                        const result = getMatchResultForPlayers(t, match, p1.id, p2.id);
+                        row.push(`${result.aScore}:${result.bScore}`);
                     } else {
                         row.push('?');
                     }
@@ -1452,11 +1791,9 @@ document.addEventListener('DOMContentLoaded', () => {
         csv += `\n--- SEZNAM ZÁPASŮ ---\n`;
         csv += `Hráč 1,Hráč 2,Skóre 1,Skóre 2,Dokončeno\n`;
         t.matches.forEach(m => {
-            const p1 = getGlobalPlayer(m.player1Id);
-            const p2 = getGlobalPlayer(m.player2Id);
-            if (p1 && p2) {
-                csv += `${escapeCsv(p1.name)},${escapeCsv(p2.name)},${m.score1},${m.score2},${m.completed ? 'Ano' : 'Ne'}\n`;
-            }
+            const team1Label = formatPlayersLabel(getSidePlayerIds(t, m, 1));
+            const team2Label = formatPlayersLabel(getSidePlayerIds(t, m, 2));
+            csv += `${escapeCsv(team1Label)},${escapeCsv(team2Label)},${m.score1},${m.score2},${m.completed ? 'Ano' : 'Ne'}\n`;
         });
         
         const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -1546,13 +1883,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (p1.id === p2.id) {
                     html += `<td style="padding: 6px; text-align: center; border: 1px solid #ddd; background-color: #e5e7eb;">-</td>`;
                 } else {
-                    const match = t.matches.find(m => m.completed && ((m.player1Id === p1.id && m.player2Id === p2.id) || (m.player1Id === p2.id && m.player2Id === p1.id)));
+                    const match = t.matches.find(m => {
+                        const result = getMatchResultForPlayers(t, m, p1.id, p2.id);
+                        return result && m.completed;
+                    });
                     if (match) {
-                        const p1Score = match.player1Id === p1.id ? match.score1 : match.score2;
-                        const p2Score = match.player1Id === p1.id ? match.score2 : match.score1;
-                        const bgColor = p1Score > p2Score ? '#dcfce7' : '#fee2e2';
-                        const textColor = p1Score > p2Score ? '#166534' : '#991b1b';
-                        html += `<td style="padding: 6px; text-align: center; border: 1px solid #ddd; background-color: ${bgColor}; color: ${textColor}; font-weight: bold;">${p1Score}:${p2Score}</td>`;
+                        const result = getMatchResultForPlayers(t, match, p1.id, p2.id);
+                        const bgColor = result.aScore > result.bScore ? '#dcfce7' : '#fee2e2';
+                        const textColor = result.aScore > result.bScore ? '#166534' : '#991b1b';
+                        html += `<td style="padding: 6px; text-align: center; border: 1px solid #ddd; background-color: ${bgColor}; color: ${textColor}; font-weight: bold;">${result.aScore}:${result.bScore}</td>`;
                     } else {
                         html += `<td style="padding: 6px; text-align: center; border: 1px solid #ddd; color: #9ca3af;">?</td>`;
                     }
@@ -1610,14 +1949,31 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderStatsScreen() {
         const t = getTournament(); document.getElementById('stats-tournament-name').textContent = t.name;
         const stats = calculateStats(t); document.getElementById('stats-leaderboard').innerHTML = templates.leaderboardTable(stats, t);
+        const teamContainer = document.getElementById('stats-team-leaderboard');
+        if (isDoubleTournament(t)) {
+            const teamStats = calculateTeamStats(t);
+            teamContainer.innerHTML = templates.teamLeaderboard(teamStats);
+            teamContainer.classList.toggle('hidden', teamStats.length === 0);
+        } else {
+            teamContainer.innerHTML = '';
+            teamContainer.classList.add('hidden');
+        }
         const matrixContainer = document.getElementById('stats-matrix'); const players = t.playerIds.map(getGlobalPlayer).filter(Boolean);
         let matrixHTML = `<table class="w-full text-sm text-center border-collapse"><thead><tr class="bg-gray-50"><th class="border p-2"></th>${players.map(p => `<th class="border p-2"><div class="flex items-center justify-center gap-1"><div class="w-3 h-3 rounded-full ${playerColors[t.playerIds.indexOf(p.id) % playerColors.length]}"></div> ${p.name}</div></th>`).join('')}</tr></thead><tbody>`;
         players.forEach(p1 => {
             matrixHTML += `<tr><td class="border p-2 font-bold bg-gray-50"><div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full ${playerColors[t.playerIds.indexOf(p1.id) % playerColors.length]}"></div> ${p1.name}</div></td>`;
             players.forEach(p2 => {
                 if (p1.id === p2.id) { matrixHTML += `<td class="border p-2 bg-gray-200"></td>`; } else {
-                    const match = t.matches.find(m => m.completed && ((m.player1Id === p1.id && m.player2Id === p2.id) || (m.player1Id === p2.id && m.player2Id === p1.id)));
-                    if (match) { const p1Score = match.player1Id === p1.id ? match.score1 : match.score2; const p2Score = match.player1Id === p1.id ? match.score2 : match.score1; matrixHTML += `<td class="border p-2 font-bold ${p1Score > p2Score ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${p1Score}:${p2Score}</td>`; } else { matrixHTML += `<td class="border p-2 text-gray-400">?</td>`; }
+                    const match = t.matches.find(m => {
+                        const result = getMatchResultForPlayers(t, m, p1.id, p2.id);
+                        return result && m.completed;
+                    });
+                    if (match) {
+                        const result = getMatchResultForPlayers(t, match, p1.id, p2.id);
+                        matrixHTML += `<td class="border p-2 font-bold ${result.aScore > result.bScore ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${result.aScore}:${result.bScore}</td>`;
+                    } else {
+                        matrixHTML += `<td class="border p-2 text-gray-400">?</td>`;
+                    }
                 }
             }); matrixHTML += `</tr>`;
         }); matrixHTML += `</tbody></table>`;
@@ -1631,13 +1987,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const renderStartMatchModal = (m) => {
         const t = getTournament();
+        if (isDoubleTournament(t)) {
+            const sides = getDisplaySides(t, m);
+            openModal(
+                `<div class="modal-backdrop">
+                    <div class="modal-content bg-white p-6 rounded-xl shadow-sm space-y-6 text-center max-w-md mx-auto my-8">
+                        <h1 class="text-2xl font-bold">Start zápasu</h1>
+                        <p class="text-gray-500">Vyberte tým, který má první podání</p>
+                        <div class="grid grid-cols-2 gap-4">
+                            <button data-action="set-first-server" data-team-side="1" class="p-4 rounded-lg font-bold text-white ${sides.raw.side1.colorClass} hover:opacity-90">
+                                ${formatPlayersLabel(sides.raw.side1.playerIds)}
+                                <span class="block text-xs font-normal opacity-80">${sides.raw.side1.playerIds.map(id => getGlobalPlayer(id)?.name || '???').join(' • ')}</span>
+                            </button>
+                            <button data-action="set-first-server" data-team-side="2" class="p-4 rounded-lg font-bold text-white ${sides.raw.side2.colorClass} hover:opacity-90">
+                                ${formatPlayersLabel(sides.raw.side2.playerIds)}
+                                <span class="block text-xs font-normal opacity-80">${sides.raw.side2.playerIds.map(id => getGlobalPlayer(id)?.name || '???').join(' • ')}</span>
+                            </button>
+                        </div>
+                        <button data-action="close-modal" class="btn btn-secondary w-full mt-4">Zpět</button>
+                    </div>
+                </div>`
+            );
+            return;
+        }
+
         const p1 = getGlobalPlayer(m.player1Id);
         const p2 = getGlobalPlayer(m.player2Id);
-
         const displayP1 = m.sidesSwapped ? p2 : p1;
         const displayP2 = m.sidesSwapped ? p1 : p2;
-        
-        // Použijeme barvy podle pořadí hráče v turnaji
         const p1Color = playerColors[t.playerIds.indexOf(displayP1.id) % playerColors.length];
         const p2Color = playerColors[t.playerIds.indexOf(displayP2.id) % playerColors.length];
 
