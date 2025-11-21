@@ -74,7 +74,9 @@
         #voice-assist-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
         #show-locked-toggle:checked ~ .toggle-checkbox { background-color: #22c55e; }
         #show-locked-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
-        
+        #motivational-phrases-toggle:checked ~ .toggle-checkbox { background-color: #22c55e; }
+        #motivational-phrases-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
+
         @media (max-width: 768px) {
             html:has(body.game-active) {
                 margin: 0 !important;
@@ -83,23 +85,23 @@
                 height: 100vh !important;
                 overflow: hidden !important;
             }
-            body.game-active { 
-                padding: 0 !important; 
-                margin: 0 !important; 
+            body.game-active {
+                padding: 0 !important;
+                margin: 0 !important;
                 overflow: hidden !important;
                 width: 100vw !important;
                 height: 100vh !important;
             }
-            body.game-active #app { 
-                padding: 0 !important; 
-                margin: 0 !important; 
+            body.game-active #app {
+                padding: 0 !important;
+                margin: 0 !important;
                 max-width: none !important;
                 width: 100vw !important;
                 height: 100vh !important;
                 overflow: hidden !important;
             }
-            body.game-active #game-screen { 
-                height: 100vh !important; 
+            body.game-active #game-screen {
+                height: 100vh !important;
                 width: 100vw !important;
                 max-width: none !important;
                 margin: 0 !important;
@@ -150,8 +152,15 @@
                                 </div>
                             </label>
                             <label for="voice-assist-toggle" class="cursor-pointer flex items-center justify-between">
-                                <span class="flex items-center"><i class="fa-solid fa-microphone-lines w-6 mr-2"></i>Hlas</span>
+                                <span class="flex items-center"><i class="fa-solid fa-comment-dots w-6 mr-2"></i>Hlas</span>
                                 <input type="checkbox" id="voice-assist-toggle" data-action="toggle-voice-assist" class="sr-only">
+                                <div class="relative w-10 h-5 bg-gray-300 rounded-full transition-colors toggle-checkbox">
+                                    <div class="absolute left-0 top-0 w-5 h-5 bg-white rounded-full shadow transform transition-transform toggle-label"></div>
+                                </div>
+                            </label>
+                            <label for="motivational-phrases-toggle" class="cursor-pointer flex items-center justify-between">
+                                <span class="flex items-center"><i class="fa-solid fa-comments w-6 mr-2"></i>Motivační hlášky</span>
+                                <input type="checkbox" id="motivational-phrases-toggle" data-action="toggle-motivational-phrases" class="sr-only">
                                 <div class="relative w-10 h-5 bg-gray-300 rounded-full transition-colors toggle-checkbox">
                                     <div class="absolute left-0 top-0 w-5 h-5 bg-white rounded-full shadow transform transition-transform toggle-label"></div>
                                 </div>
@@ -230,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
             soundsEnabled: true,
             voiceAssistEnabled: false,
             showLockedTournaments: false,
+            motivationalPhrasesEnabled: true,
             ...(data.settings || {})
         };
         state.playerDatabase = data.playerDatabase.map(p => ({
@@ -296,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Nepodařilo se načíst data ze serveru. Aplikace nemusí fungovat správně.');
         }
     };
-    
+
     function playSound(playerIndex) {
         if (!state.settings.soundsEnabled || !audioContext) return;
         if (audioContext.state === 'suspended') { audioContext.resume(); }
@@ -309,16 +319,16 @@ document.addEventListener('DOMContentLoaded', () => {
         gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.1);
         oscillator.start(audioContext.currentTime); oscillator.stop(audioContext.currentTime + 0.1);
     }
-    
+
     function speak(text, force = false) {
         if ((!state.settings.voiceAssistEnabled && !force) || !synth) return;
         // Zrušíme předchozí výstup, pokud nějaký je, aby se zprávy nekumulovaly
-        synth.cancel(); 
+        synth.cancel();
         let utterance = new SpeechSynthesisUtterance(text); // Vytvoříme novou instanci pro každou hlášku
         utterance.lang = 'cs-CZ';
         synth.speak(utterance);
     }
-    
+
     // Funkce pro generování unikátního názvu turnaje
     function generateUniqueTournamentName(baseName, excludeTournamentId = null) {
         // Odstraníme případné číslo na konci (např. "Turnaj (2)" -> "Turnaj")
@@ -327,51 +337,51 @@ document.addEventListener('DOMContentLoaded', () => {
         if (nameMatch) {
             cleanBaseName = nameMatch[1].trim();
         }
-        
+
         // Zkontrolujeme, jestli základní název už existuje
         const existingNames = state.tournaments
             .filter(t => excludeTournamentId === null || t.id != excludeTournamentId)
             .map(t => t.name);
-        
+
         if (!existingNames.includes(cleanBaseName)) {
             return cleanBaseName;
         }
-        
+
         // Pokud existuje, přidáme číslo v závorce
         let copyNumber = 2;
         while (existingNames.includes(`${cleanBaseName} (${copyNumber})`)) {
             copyNumber++;
         }
-        
+
         return `${cleanBaseName} (${copyNumber})`;
     }
-    
+
     function initializeAudio() { if (!audioContext) { audioContext = new (window.AudioContext || window.webkitAudioContext)(); } }
 
     const getGlobalPlayer = (id) => state.playerDatabase.find(p => p.id === id);
     const getTournament = (id = state.activeTournamentId) => state.tournaments.find(t => t.id === id);
     const getMatch = (tournament, matchId) => tournament.matches.find(m => m.id == matchId);
     const formatDate = (iso) => new Date(iso).toLocaleDateString('cs-CZ');
-    const showScreen = (screenName) => { 
+    const showScreen = (screenName) => {
         const isGameScreen = screenName === 'game';
         if (!isGameScreen) {
             document.body.classList.remove('game-active');
             app.classList.add('max-w-xl', 'mx-auto', 'p-4');
         }
-        Object.values(screens).forEach(s => s.classList.remove('active')); 
-        if(screens[screenName]) screens[screenName].classList.add('active'); 
-        window.scrollTo(0,0); 
+        Object.values(screens).forEach(s => s.classList.remove('active'));
+        if(screens[screenName]) screens[screenName].classList.add('active');
+        window.scrollTo(0,0);
     };
     const openModal = (html) => { modalsContainer.innerHTML = html; };
     const closeModal = () => { modalsContainer.innerHTML = ''; };
     const getCzechPlayerDeclension = (count) => { if (count === 1) return 'hráč'; if (count >= 2 && count <= 4) return 'hráči'; return 'hráčů'; };
-    const renderGameScreen = (content) => { 
+    const renderGameScreen = (content) => {
         document.body.classList.add('game-active');
         app.classList.remove('max-w-xl', 'mx-auto', 'p-4');
-        screens.game.innerHTML = content; 
-        showScreen('game'); 
+        screens.game.innerHTML = content;
+        showScreen('game');
     };
-    
+
     const templates = {
         leaderboardTable: (stats, t) => `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">Poz.</th><th class="p-2">Hráč</th><th class="p-2 text-center">Vítězství</th><th class="p-2 text-center">Porážky</th><th class="p-2 text-center">Odehráno</th><th class="p-2 text-center">Úspěšnost</th></tr></thead><tbody>${stats.map((s, i) => `<tr class="border-b last:border-none"><td class="p-2 font-bold">${i === 0 && s.wins > 0 ? '🏆' : `#${i+1}`}</td><td class="p-2 flex items-center gap-2"><div class="w-4 h-4 rounded-full ${playerColors[t.playerIds.indexOf(s.player.id) % playerColors.length]}"></div> ${s.player.name}</td><td class="p-2 text-center font-bold text-green-600">${s.wins}</td><td class="p-2 text-center text-red-500">${s.losses}</td><td class="p-2 text-center">${s.played}</td><td class="p-2 text-center font-semibold">${s.played > 0 ? Math.round((s.wins / s.played) * 100) : 0}%</td></tr>`).join('')}</tbody></table></div>`
     };
@@ -413,10 +423,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return shuffled;
     }
-    
+
     const renderPlayerDbScreen = () => {
         const container = document.getElementById('player-db-list-container');
-        if(state.playerDatabase.length === 0) { container.innerHTML = `<div class="text-center text-gray-500 p-8 bg-white rounded-xl">Databáze je prázdná. Přidejte prvního hráče.</div>`; } 
+        if(state.playerDatabase.length === 0) { container.innerHTML = `<div class="text-center text-gray-500 p-8 bg-white rounded-xl">Databáze je prázdná. Přidejte prvního hráče.</div>`; }
         else {
             container.innerHTML = state.playerDatabase.sort((a,b) => a.name.localeCompare(b.name)).map(p => {
                 const photo = p.photoUrl || `data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2240%22%20height%3D%2240%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%2240%22%20height%3D%2240%22%20fill%3D%22%23e5e7eb%22%20rx%3D%2220%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22central%22%20text-anchor%3D%22middle%22%20font-family%3D%22Inter%22%20font-size%3D%2216%22%20fill%3D%22%239ca3af%22%3E${p.name.charAt(0).toUpperCase()}%3C%2Ftext%3E%3C%2Fsvg%3E`;
@@ -425,7 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         showScreen('playerDb');
     };
-    
+
     const getTournamentStatus = (t) => {
         const completedCount = t.matches.filter(m => m.completed).length;
         const totalMatches = t.matches.length;
@@ -443,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Filtrujeme turnaje podle nastavení zobrazení zamčených turnajů
         const showLocked = state.settings.showLockedTournaments || false;
         const visibleTournaments = showLocked ? state.tournaments : state.tournaments.filter(t => !t.isLocked);
-        
+
         if (visibleTournaments.length === 0) {
             container.innerHTML = `<div class="text-center py-10 px-6 bg-white rounded-xl shadow-sm"><i class="fa-solid fa-trophy text-5xl text-gray-300"></i><h2 class="text-xl font-semibold text-gray-700 mt-4">Žádné turnaje</h2><p class="text-gray-500 mt-1">Vytvořte svůj první ping pongový turnaj</p><button data-action="show-new-tournament-modal" class="btn btn-primary mt-4">Vytvořit turnaj</button></div>`;
         } else {
@@ -454,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (isFinished) { const stats = calculateStats(t); const winnerId = stats.length > 0 && stats[0].wins > 0 ? stats[0].player.id : null; const winner = winnerId ? getGlobalPlayer(winnerId) : null; winnerInfo = `<p class="font-bold text-yellow-500"><i class="fa-solid fa-trophy"></i> Vítěz: ${winner ? winner.name : 'Remíza'}</p>`; }
                 const status = getTournamentStatus(t);
                 const nameClass = t.isLocked ? 'text-gray-500' : '';
-                
+
                 let buttonText = "Zobrazit";
                 let buttonClass = "btn-secondary";
 
@@ -479,11 +489,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const t = getTournament(); if (!t) { renderMainScreen(); return; }
         document.getElementById('tournament-title').innerHTML = `<div class="flex items-center gap-2"><span id="tournament-name-text">${t.name}</span><button data-action="quick-edit-name" class="btn btn-secondary !p-0 w-8 h-8 text-xs flex-shrink-0" title="Rychlá úprava názvu"><i class="fa-solid fa-pencil"></i></button></div>`;
         document.getElementById('tournament-progress').textContent = `${t.matches.filter(m => m.completed).length}/${t.matches.length} zápasů dokončeno`;
-        
+
         const renderMatch = (m, isCompleted, index) => {
-            let p1 = getGlobalPlayer(m.player1Id); 
+            let p1 = getGlobalPlayer(m.player1Id);
             let p2 = getGlobalPlayer(m.player2Id);
-            
+
             if (m.sidesSwapped) {
                 [p1, p2] = [p2, p1]; // Prohodíme hráče pro zobrazení
             }
@@ -494,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const p2Color = playerColors[t.playerIds.indexOf(p2.id) % playerColors.length];
             const playerIcon = (player, color) => `<div class="w-6 h-6 ${color} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">${player.name.charAt(0).toUpperCase()}</div>`;
             const servingIndicator = ' <span class="text-base">🏓</span>';
-            
+
             let content;
             if (isCompleted) {
                 const p1Original = getGlobalPlayer(m.player1Id);
@@ -516,7 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const upcomingContainer = document.getElementById('upcoming-matches-container');
         const completedContainer = document.getElementById('completed-matches-container');
         const finalResultsContainer = document.getElementById('final-results-container');
-        
+
         const completedCount = t.matches.filter(m => m.completed).length;
         const totalMatches = t.matches.length;
         const isFinished = totalMatches > 0 && completedCount === totalMatches;
@@ -532,12 +542,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const upcoming = t.matches.filter(m => !m.completed);
             upcomingContainer.innerHTML = upcoming.length > 0 ? `<h2 class="text-xl font-bold">Nadcházející zápasy</h2>${upcoming.map((m,i) => renderMatch(m, false, i)).join('')}` : (t.matches.length > 0 ? '' : `<div class="text-center p-4 bg-white rounded-xl text-gray-500">Žádné zápasy. Přidejte hráče v nastavení.</div>`);
         }
-        
+
         const completed = t.matches.filter(m => m.completed);
         completedContainer.innerHTML = completed.length > 0 ? `<h2 class="text-xl font-bold">Dokončené zápasy</h2>${completed.map(m => renderMatch(m, true, -1)).join('')}` : '';
         showScreen('tournament');
     };
-    
+
     let tempPlayerIds = []; let autocompleteIndex = -1;
 
     function setupAutocomplete(inputId, containerId, onSelect, currentIds) {
@@ -565,14 +575,14 @@ document.addEventListener('DOMContentLoaded', () => {
         input.addEventListener('input', showSuggestions); input.addEventListener('focus', showSuggestions);
         input.addEventListener('keydown', (e) => {
             const items = suggestionsContainer.querySelectorAll('.autocomplete-suggestion');
-            if (e.key === 'ArrowDown') { e.preventDefault(); if (autocompleteIndex < items.length - 1) autocompleteIndex++; updateHighlight(); } 
-            else if (e.key === 'ArrowUp') { e.preventDefault(); if (autocompleteIndex > 0) autocompleteIndex--; updateHighlight(); } 
+            if (e.key === 'ArrowDown') { e.preventDefault(); if (autocompleteIndex < items.length - 1) autocompleteIndex++; updateHighlight(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); if (autocompleteIndex > 0) autocompleteIndex--; updateHighlight(); }
             else if (e.key === 'Enter') {
                 e.preventDefault();
-                if (autocompleteIndex > -1 && items[autocompleteIndex]) { items[autocompleteIndex].click(); } 
+                if (autocompleteIndex > -1 && items[autocompleteIndex]) { items[autocompleteIndex].click(); }
                 else if (input.value.trim() !== '') {
                     const name = input.value.trim(); const existingPlayer = state.playerDatabase.find(p => p.name.toLowerCase() === name.toLowerCase());
-                    if (existingPlayer) { if (!currentIds.includes(existingPlayer.id)) onSelect(existingPlayer.id); } 
+                    if (existingPlayer) { if (!currentIds.includes(existingPlayer.id)) onSelect(existingPlayer.id); }
                     else { if (confirm(`Hráč "${name}" neexistuje. Chcete ho přidat do databáze a turnaje?`)) { const newPlayer = { id: Date.now(), name, photoUrl: '', strengths: '', weaknesses: '' }; state.playerDatabase.push(newPlayer); saveState(); onSelect(newPlayer.id); } }
                     input.value = ''; suggestionsContainer.innerHTML = '';
                 }
@@ -580,7 +590,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         document.addEventListener('click', (e) => { if (suggestionsContainer && !suggestionsContainer.parentElement.contains(e.target)) suggestionsContainer.innerHTML = ''; });
     }
-    
+
     const calculateStats = (t) => {
         const stats = t.playerIds.map(id => ({ player: getGlobalPlayer(id), played: 0, wins: 0, losses: 0, scoreFor: 0, scoreAgainst: 0 }));
         t.matches.filter(m => m.completed).forEach(m => {
@@ -597,13 +607,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return b.scoreFor - a.scoreFor;
         });
     };
-    
+
     const checkWinCondition = (match, pointsToWin) => {
         if (match.score1 >= pointsToWin && match.score1 >= match.score2 + 2) return match.player1Id;
         if (match.score2 >= pointsToWin && match.score2 >= match.score1 + 2) return match.player2Id;
         return null;
     };
-    
+
     const recalculateServiceState = (match, pointsToWin) => {
         const totalScore = match.score1 + match.score2;
         const p1Id = match.player1Id;
@@ -613,7 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
             match.servingPlayer = null;
             return;
         }
-        
+
         const firstServerId = match.firstServer === 1 ? p1Id : p2Id;
         const otherPlayerId = match.firstServer === 1 ? p2Id : p1Id;
 
@@ -629,7 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
             match.servingPlayer = firstServerId;
             return;
         }
-        
+
         const pointsAfterFirst = totalScore - 1;
         const serviceBlockIndex = Math.floor(pointsAfterFirst / 2);
 
@@ -644,37 +654,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const t = getTournament();
         const m = getMatch(t, state.activeMatchId);
         if (!t || !m || state.scoreHistory.length === 0) return;
-        
+
         // Získáme poslední stav z historie
         const lastState = state.scoreHistory.pop();
-        
+
         // Ověříme, že historie patří k aktuálnímu zápasu
         if (lastState.matchId !== m.id) {
             state.scoreHistory.push(lastState); // Vrátíme zpět, pokud to není správný zápas
             return;
         }
-        
+
         // Obnovíme stav
         m.score1 = lastState.score1;
         m.score2 = lastState.score2;
         m.servingPlayer = lastState.servingPlayer;
         m.firstServer = lastState.firstServer;
-        
+
         // Znovu vypočítáme stav podání
         if (m.firstServer) {
             recalculateServiceState(m, t.pointsToWin);
         }
-        
+
         // Aktualizujeme v databázi
         const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
         await apiCall('updateMatch', { id: m.id, data: matchPayload });
-        
+
         // Znovu vykreslíme obrazovku
         renderGameBoard();
     };
 
     const updateScore = async (playerId, delta) => {
-        const t = getTournament(); 
+        const t = getTournament();
         const m = getMatch(t, state.activeMatchId);
         if (!t || !m) return;
 
@@ -682,7 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const scoreProp = isPlayer1 ? 'score1' : 'score2';
 
         if (delta > 0 && checkWinCondition(m, t.pointsToWin)) return;
-        
+
         const currentScore = m[scoreProp];
         if (currentScore + delta >= 0) {
             // Uložíme historii před změnou (pouze pro přidání bodu)
@@ -695,19 +705,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     firstServer: m.firstServer
                 });
             }
-            
+
             m[scoreProp] += delta;
-            
+
             recalculateServiceState(m, t.pointsToWin);
             playSound(isPlayer1 ? 1 : 2); // Zvuk zůstává navázaný na pozici
-            
+
             if (state.settings.voiceAssistEnabled) {
                 const servingPlayer = getGlobalPlayer(m.servingPlayer);
                 const servingPlayerIsP1 = m.servingPlayer === m.player1Id;
-                
+
                 const servingPlayerScore = servingPlayerIsP1 ? m.score1 : m.score2;
                 const otherPlayerScore = servingPlayerIsP1 ? m.score2 : m.score1;
-                
+
                 if (m.completed) { // This state is set after checkWinCondition, so we check again
                     const winnerCheck = checkWinCondition(m, t.pointsToWin);
                     if(winnerCheck) {
@@ -717,11 +727,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         speak(`Konec zápasu. Vítěz ${winner.name}. ${winnerScore} : ${loserScore}`);
                     }
                 } else {
-                    let speechText = `${servingPlayerScore} : ${otherPlayerScore}, podání ${servingPlayer.name}`;
-                    // S pravděpodobností 40% přidáme náhodnou hlášku
-                    if (Math.random() < 0.4) {
+                    let speechText = `${servingPlayer.name}, ${servingPlayerScore} : ${otherPlayerScore}`;
+                    // S pravděpodobností 40% přidáme náhodnou hlášku (pokud jsou motivační hlášky zapnuté)
+                    if (state.settings.motivationalPhrasesEnabled && Math.random() < 0.4) {
                         const randomPhrase = encouragingPhrases[Math.floor(Math.random() * encouragingPhrases.length)];
-                        speechText += `. ${randomPhrase}`;
+                        speechText += `, ${randomPhrase}`;
                     }
                     speak(speechText);
                 }
@@ -729,7 +739,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
             await apiCall('updateMatch', { id: m.id, data: matchPayload });
-            
+
             renderGameBoard();
         }
     };
@@ -819,11 +829,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const uniqueName = generateUniqueTournamentName(name);
             // Formát data pro MySQL: YYYY-MM-DD HH:MM:SS
             const now = new Date();
-            const mysqlDate = now.getFullYear() + '-' + 
-                String(now.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(now.getDate()).padStart(2, '0') + ' ' + 
-                String(now.getHours()).padStart(2, '0') + ':' + 
-                String(now.getMinutes()).padStart(2, '0') + ':' + 
+            const mysqlDate = now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0') + ' ' +
+                String(now.getHours()).padStart(2, '0') + ':' +
+                String(now.getMinutes()).padStart(2, '0') + ':' +
                 String(now.getSeconds()).padStart(2, '0');
             const payload = {
                 name: uniqueName,
@@ -831,9 +841,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 createdAt: mysqlDate,
                 playerIds: tempPlayerIds
             };
-            
+
             await apiCall('createTournament', payload);
-            
+
             closeModal();
             renderMainScreen();
         },
@@ -855,10 +865,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 t.matches = t.matches.filter(m => t.playerIds.includes(m.player1Id) && t.playerIds.includes(m.player2Id));
                 // Dle nové logiky API přegeneruje zápasy na backendu
             }
-            
+
             const payload = { id: t.id, data: t };
             await apiCall('updateTournament', payload);
-            
+
             closeModal();
             renderTournamentScreen();
         },
@@ -876,27 +886,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('❌ [COPY] Turnaj nenalezen!');
                 return;
             }
-            
+
             // Uložíme ID turnaje před načtením stavu
             const tournamentId = t.id;
-            
+
             // Načteme aktuální stav z API, abychom měli všechny existující turnaje
             await loadState();
-            
+
             // Znovu načteme turnaj ze stavu (mohl se změnit po loadState)
             const currentTournament = getTournament(tournamentId);
             if (!currentTournament) {
                 console.error('❌ [COPY] Turnaj nenalezen po načtení stavu!');
                 return;
             }
-            
+
             // Zjistíme dnešní datum ve formátu DD. MM. YYYY
             const now = new Date();
             const todayStr = `${now.getDate()}. ${now.getMonth() + 1}. ${now.getFullYear()}`;
-            
+
             // Zkontrolujeme, jestli je v názvu turnaje dnešní datum
             const hasTodayDate = currentTournament.name.includes(todayStr);
-            
+
             let baseName;
             if (hasTodayDate) {
                 // Pokud je v názvu dnešní datum, použijeme stávající název
@@ -910,34 +920,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Přidáme dnešní datum
                 baseName = `${baseName} ${todayStr}`;
             }
-            
+
             // Použijeme funkci pro generování unikátního názvu (vyloučíme původní turnaj)
             const newName = generateUniqueTournamentName(baseName, currentTournament.id);
-            
+
             // Vytvoříme nový turnaj se stejnými hráči
             // Formát data pro MySQL: YYYY-MM-DD HH:MM:SS
-            const mysqlDate = now.getFullYear() + '-' + 
-                String(now.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(now.getDate()).padStart(2, '0') + ' ' + 
-                String(now.getHours()).padStart(2, '0') + ':' + 
-                String(now.getMinutes()).padStart(2, '0') + ':' + 
+            const mysqlDate = now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0') + ' ' +
+                String(now.getHours()).padStart(2, '0') + ':' +
+                String(now.getMinutes()).padStart(2, '0') + ':' +
                 String(now.getSeconds()).padStart(2, '0');
-            
+
             const payload = {
                 name: newName,
                 pointsToWin: currentTournament.pointsToWin,
                 createdAt: mysqlDate,
                 playerIds: [...currentTournament.playerIds]
             };
-            
+
             let newTournament = null;
             try {
                 const apiResponse = await apiCall('createTournament', payload);
-                
+
                 if (apiResponse && apiResponse.tournaments) {
                     // Hledáme nový turnaj v odpovědi z API
                     newTournament = apiResponse.tournaments.find(tour => tour.name === newName);
-                    
+
                     // Pokud jsme ho nenašli podle názvu, zkusíme najít nejnovější turnaj (nejvyšší ID)
                     if (!newTournament && apiResponse.tournaments.length > 0) {
                         const sortedTournaments = [...apiResponse.tournaments].sort((a, b) => parseInt(b.id) - parseInt(a.id));
@@ -948,11 +958,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 }
-                
+
                 // Pokud jsme ho nenašli v odpovědi, zkusíme to ve stavu
                 if (!newTournament) {
                     newTournament = state.tournaments.find(tour => tour.name === newName);
-                    
+
                     // Zkusíme najít nejnovější turnaj ve stavu
                     if (!newTournament && state.tournaments.length > 0) {
                         const sortedTournaments = [...state.tournaments].sort((a, b) => parseInt(b.id) - parseInt(a.id));
@@ -962,12 +972,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 }
-                
+
                 // Pokud stále ne, načteme data znovu
                 if (!newTournament) {
                     await loadState();
                     newTournament = state.tournaments.find(tour => tour.name === newName);
-                    
+
                     // Zkusíme najít nejnovější turnaj po načtení
                     if (!newTournament && state.tournaments.length > 0) {
                         const sortedTournaments = [...state.tournaments].sort((a, b) => parseInt(b.id) - parseInt(a.id));
@@ -982,7 +992,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('Chyba při vytváření kopie turnaje: ' + error.message);
                 return;
             }
-            
+
             if (newTournament) {
                 // Pro každý zápas nastavíme sides_swapped = true
                 for (const match of newTournament.matches) {
@@ -1009,7 +1019,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('❌ [COPY] Nový turnaj nebyl nalezen po vytvoření!');
                 alert('Turnaj byl vytvořen, ale nepodařilo se ho najít. Obnovte stránku.');
             }
-            
+
             closeModal();
             renderMainScreen();
         },
@@ -1061,7 +1071,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const selectedPlayerId = parseInt(target.dataset.playerId);
             m.firstServer = (selectedPlayerId === m.player1Id) ? 1 : 2;
             m.servingPlayer = selectedPlayerId;
-            
+
             const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
             await apiCall('updateMatch', { id: m.id, data: matchPayload });
 
@@ -1076,7 +1086,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const t = getTournament();
             const m = getMatch(t, state.activeMatchId);
             m.completed = true;
-            
+
             const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
             await apiCall('updateMatch', { id: m.id, data: matchPayload });
 
@@ -1092,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const t = getTournament();
             const matchId = target.dataset.matchId;
             const m = getMatch(t, matchId);
-            
+
             if (!m) {
                 console.error("Zápas pro editaci nenalezen:", matchId);
                 alert("Došlo k chybě, zápas nebyl nalezen.");
@@ -1101,7 +1111,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             m.score1 = parseInt(document.getElementById('edit-score1').value) || 0;
             m.score2 = parseInt(document.getElementById('edit-score2').value) || 0;
-            
+
             const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
             await apiCall('updateMatch', { id: m.id, data: matchPayload });
 
@@ -1112,19 +1122,20 @@ document.addEventListener('DOMContentLoaded', () => {
         'close-and-home':()=>{closeModal();renderMainScreen();},
         'export-data':()=>{if(state.tournaments.length===0&&state.playerDatabase.length===0){alert("Není co exportovat.");return;}const dataStr=JSON.stringify(state,null,2);const dataBlob=new Blob([dataStr],{type:'application/json'});const url=URL.createObjectURL(dataBlob);const a=document.createElement('a');a.href=url;a.download='ping-pong-turnaje.json';a.click();URL.revokeObjectURL(url);},
         'close-modal': closeModal,
-        'toggle-settings-menu': () => { 
-            const menu = document.getElementById('settings-menu'); 
-            menu.classList.toggle('hidden'); 
-            if(!menu.classList.contains('hidden')) { 
-                document.getElementById('sound-toggle').checked = state.settings.soundsEnabled; 
+        'toggle-settings-menu': () => {
+            const menu = document.getElementById('settings-menu');
+            menu.classList.toggle('hidden');
+            if(!menu.classList.contains('hidden')) {
+                document.getElementById('sound-toggle').checked = state.settings.soundsEnabled;
                 document.getElementById('voice-assist-toggle').checked = state.settings.voiceAssistEnabled;
                 document.getElementById('show-locked-toggle').checked = state.settings.showLockedTournaments || false;
-            } 
+                document.getElementById('motivational-phrases-toggle').checked = !!state.settings.motivationalPhrasesEnabled;
+            }
         },
-        'toggle-sound-ingame': () => { 
-            state.settings.soundsEnabled = !state.settings.soundsEnabled; 
+        'toggle-sound-ingame': () => {
+            state.settings.soundsEnabled = !state.settings.soundsEnabled;
             apiCall('saveSettings', { key: 'soundsEnabled', value: state.settings.soundsEnabled });
-            renderGameBoard(); 
+            renderGameBoard();
         },
         'toggle-voice-assist-ingame': () => {
             state.settings.voiceAssistEnabled = !state.settings.voiceAssistEnabled;
@@ -1136,29 +1147,34 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             renderGameBoard();
         },
+        'toggle-motivational-phrases-ingame': () => {
+            state.settings.motivationalPhrasesEnabled = !state.settings.motivationalPhrasesEnabled;
+            apiCall('saveSettings', { key: 'motivationalPhrasesEnabled', value: state.settings.motivationalPhrasesEnabled });
+            renderGameBoard();
+        },
         'quick-edit-name': (target) => { const textEl = document.getElementById('tournament-name-text'); const oldName = textEl.textContent; const input = document.createElement('input'); input.type = 'text'; input.value = oldName; input.className = 'text-3xl font-bold bg-white border rounded w-full'; textEl.parentElement.replaceChild(input, textEl); input.focus(); const save = async () => { const newName = input.value.trim(); const t = getTournament(); if(newName) { t.name = newName; } await apiCall('updateTournament', { id: t.id, data: t }); renderTournamentScreen(); }; input.addEventListener('blur', save); input.addEventListener('keydown', (e) => { if(e.key === 'Enter') save(); if(e.key === 'Escape') { input.value = oldName; save(); } }); },
-        'move-match': (target) => { 
-            const t = getTournament(); 
-            const { id, dir } = target.dataset; 
-            const upcoming = t.matches.filter(m => !m.completed); 
+        'move-match': (target) => {
+            const t = getTournament();
+            const { id, dir } = target.dataset;
+            const upcoming = t.matches.filter(m => !m.completed);
             const index = upcoming.findIndex(m => m.id == id); // Použijeme == pro jistotu
-            if (index === -1) return; 
-            const otherIndex = dir === 'up' ? index - 1 : index + 1; 
-            if (otherIndex < 0 || otherIndex >= upcoming.length) return; 
-            
+            if (index === -1) return;
+            const otherIndex = dir === 'up' ? index - 1 : index + 1;
+            if (otherIndex < 0 || otherIndex >= upcoming.length) return;
+
             // Prohodíme celé zápasy v hlavním poli `t.matches`
             const matchIdToMove = upcoming[index].id;
             const otherMatchId = upcoming[otherIndex].id;
             const originalIndex = t.matches.findIndex(m => m.id == matchIdToMove);
             const otherOriginalIndex = t.matches.findIndex(m => m.id == otherMatchId);
 
-            [t.matches[originalIndex], t.matches[otherOriginalIndex]] = [t.matches[otherOriginalIndex], t.matches[originalIndex]]; 
-            
+            [t.matches[originalIndex], t.matches[otherOriginalIndex]] = [t.matches[otherOriginalIndex], t.matches[originalIndex]];
+
             // Po lokálním prohození pošleme nové pořadí na server
             const upcomingMatchIds = t.matches.filter(m => !m.completed).map(m => m.id);
             apiCall('reorderMatches', { matchIds: upcomingMatchIds });
-            
-            renderTournamentScreen(); 
+
+            renderTournamentScreen();
         },
         'swap-sides': (target) => {
             const t = getTournament();
@@ -1171,18 +1187,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
-    
-    app.addEventListener('click', (e) => { 
+
+    app.addEventListener('click', (e) => {
         initializeAudio();
-        const target = e.target.closest('[data-action]'); 
+        const target = e.target.closest('[data-action]');
         if (!e.target.closest('#settings-menu') && !e.target.closest('[data-action="toggle-settings-menu"]')) {
             document.getElementById('settings-menu').classList.add('hidden');
         }
-        if (target && allActions[target.dataset.action]) allActions[target.dataset.action](target); 
+        if (target && allActions[target.dataset.action]) allActions[target.dataset.action](target);
     });
     app.addEventListener('change', (e) => {
         const soundToggle = e.target.closest('[data-action="toggle-sound"]');
-        if (soundToggle) { 
+        if (soundToggle) {
             state.settings.soundsEnabled = soundToggle.checked;
             apiCall('saveSettings', { key: 'soundsEnabled', value: state.settings.soundsEnabled });
         }
@@ -1201,6 +1217,11 @@ document.addEventListener('DOMContentLoaded', () => {
             apiCall('saveSettings', { key: 'showLockedTournaments', value: state.settings.showLockedTournaments });
             renderMainScreen();
         }
+        const motivationalPhrasesToggle = e.target.closest('[data-action="toggle-motivational-phrases"]');
+        if (motivationalPhrasesToggle) {
+            state.settings.motivationalPhrasesEnabled = motivationalPhrasesToggle.checked;
+            apiCall('saveSettings', { key: 'motivationalPhrasesEnabled', value: state.settings.motivationalPhrasesEnabled });
+        }
     });
     document.getElementById('import-file').addEventListener('change', (event) => {
         const file = event.target.files[0]; if (!file) return;
@@ -1210,7 +1231,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const importedData = JSON.parse(e.target.result);
                 if (importedData && (Array.isArray(importedData.tournaments) && Array.isArray(importedData.playerDatabase))) {
-                    state.tournaments = importedData.tournaments; 
+                    state.tournaments = importedData.tournaments;
                     state.playerDatabase = importedData.playerDatabase;
                     state.settings = importedData.settings || { soundsEnabled: true };
                     // Zde by se musela volat komplexní synchronizační akce na API
@@ -1227,22 +1248,22 @@ document.addEventListener('DOMContentLoaded', () => {
             closeModal();
             return;
         }
-        
+
         // Zkontrolujeme, jestli není otevřený input nebo textarea
         const activeElement = document.activeElement;
         const isInputActive = activeElement && (
-            activeElement.tagName === 'INPUT' || 
+            activeElement.tagName === 'INPUT' ||
             activeElement.tagName === 'TEXTAREA' ||
             activeElement.isContentEditable
         );
-        
+
         if (isInputActive) return;
-        
+
         // Klávesové zkratky pro přidávání bodů (pouze při aktivní hře)
         if (screens.game.classList.contains('active') && modalsContainer.children.length === 0) {
             const t = getTournament();
             const m = getMatch(t, state.activeMatchId);
-            
+
             if (m && !m.completed) {
                 const winnerId = checkWinCondition(m, t.pointsToWin);
                 if (!winnerId) {
@@ -1251,7 +1272,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const originalP2 = getGlobalPlayer(m.player2Id);
                     const p1 = m.sidesSwapped ? originalP2 : originalP1;
                     const p2 = m.sidesSwapped ? originalP1 : originalP2;
-                    
+
                     if (e.key === 'ArrowLeft') {
                         e.preventDefault();
                         updateScore(p1.id, 1);
@@ -1274,11 +1295,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return;
         }
-        
+
         // Klávesové zkratky pro modaly
         if (modalsContainer.children.length > 0) {
             const modal = modalsContainer.lastElementChild;
-            
+
             // Modal "Kdo má první podání" - šipka vlevo/vpravo pro hráče
             const firstServerBtns = modal.querySelectorAll('[data-action="set-first-server"]');
             if (firstServerBtns.length === 2) {
@@ -1291,7 +1312,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return;
             }
-            
+
             // Modal "Průběžné pořadí" - šipka vpravo pro Pokračovat
             const continueBtn = modal.querySelector('[data-action="close-and-refresh"]');
             if (continueBtn && e.key === 'ArrowRight') {
@@ -1299,7 +1320,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 continueBtn.click();
                 return;
             }
-            
+
             // Modal "Konečné výsledky" - šipka vlevo pro Zavřít, vpravo pro Kopírovat turnaj
             const closeBtn = modal.querySelector('[data-action="close-and-home"]');
             const copyBtn = modal.querySelector('[data-action="copy-tournament"]');
@@ -1314,7 +1335,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
         }
-        
+
         // Klávesové zkratky pro tournament screen
         if (screens.tournament.classList.contains('active')) {
             // Šipka vpravo pro první tlačítko "Hrát zápas" v nadcházejících zápasech
@@ -1327,7 +1348,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return;
         }
-        
+
         // Klávesové zkratky pro main screen
         if (screens.main.classList.contains('active')) {
             // Šipka vpravo pro první tlačítko "Start turnaje"
@@ -1342,12 +1363,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function renderGameBoard() {
-        const t = getTournament(); 
-        const m = getMatch(t, state.activeMatchId); 
-        
+        const t = getTournament();
+        const m = getMatch(t, state.activeMatchId);
+
         const originalP1 = getGlobalPlayer(m.player1Id);
         const originalP2 = getGlobalPlayer(m.player2Id);
-        
+
         // Apply sideswap for display
         const p1 = m.sidesSwapped ? originalP2 : originalP1;
         const p2 = m.sidesSwapped ? originalP1 : originalP2;
@@ -1358,7 +1379,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const canAddPoints = !winnerId;
 
         const servingPlayerName = m.servingPlayer ? getGlobalPlayer(m.servingPlayer).name : '...';
-        
+
         // Použijeme barvy podle pořadí hráče v turnaji
         const p1Color = playerColors[t.playerIds.indexOf(p1.id) % playerColors.length];
         const p2Color = playerColors[t.playerIds.indexOf(p2.id) % playerColors.length];
@@ -1371,8 +1392,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p class="text-xs md:text-sm text-gray-500">Hraje se na ${t.pointsToWin} bodů</p>
                         <p class="text-sm md:text-base font-semibold">Podání: ${servingPlayerName}</p>
                     </div>
-                    <div class="w-20 md:w-24 flex justify-end gap-1 md:gap-2">
+                    <div class="w-28 md:w-32 flex justify-end gap-1 md:gap-2">
                         <button data-action="toggle-voice-assist-ingame" class="btn btn-secondary !p-0 h-8 w-8 md:h-10 md:w-10 text-base md:text-lg" title="Zapnout/vypnout hlas">${state.settings.voiceAssistEnabled ? '<i class="fa-solid fa-comment-dots"></i>' : '<i class="fa-solid fa-comment-slash"></i>'}</button>
+                        <button data-action="toggle-motivational-phrases-ingame" class="btn btn-secondary !p-0 h-8 w-8 md:h-10 md:w-10 text-base md:text-lg" title="Zapnout/vypnout motivační hlášky">${state.settings.motivationalPhrasesEnabled ? '<i class="fa-solid fa-comments"></i>' : '<i class="fa-solid fa-comment-slash"></i>'}</button>
                         <button data-action="toggle-sound-ingame" class="btn btn-secondary !p-0 h-8 w-8 md:h-10 md:w-10 text-base md:text-lg" title="Zapnout/vypnout zvuky">${state.settings.soundsEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>'}</button>
                     </div>
                 </header>
@@ -1418,7 +1440,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const t = getTournament();
         const stats = calculateStats(t);
         const players = t.playerIds.map(getGlobalPlayer).filter(Boolean);
-        
+
         let csv = `Turnaj: ${t.name}\n`;
         csv += `Datum vytvoření: ${t.createdAt ? formatDate(t.createdAt) : 'Neznámé'}\n`;
         csv += `Body k výhře: ${t.pointsToWin}\n`;
@@ -1427,7 +1449,7 @@ document.addEventListener('DOMContentLoaded', () => {
         stats.forEach((s, i) => {
             csv += `${i + 1},${escapeCsv(s.player.name)},${s.wins},${s.losses},${s.played},${s.played > 0 ? Math.round((s.wins / s.played) * 100) : 0}\n`;
         });
-        
+
         csv += `\n--- VZÁJEMNÉ ZÁPASY ---\n`;
         csv += `Hráč,${players.map(p => escapeCsv(p.name)).join(',')}\n`;
         players.forEach(p1 => {
@@ -1448,7 +1470,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             csv += row.join(',') + '\n';
         });
-        
+
         csv += `\n--- SEZNAM ZÁPASŮ ---\n`;
         csv += `Hráč 1,Hráč 2,Skóre 1,Skóre 2,Dokončeno\n`;
         t.matches.forEach(m => {
@@ -1458,7 +1480,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 csv += `${escapeCsv(p1.name)},${escapeCsv(p2.name)},${m.score1},${m.score2},${m.completed ? 'Ano' : 'Ne'}\n`;
             }
         });
-        
+
         const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1474,7 +1496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const t = getTournament();
         const stats = calculateStats(t);
         const players = t.playerIds.map(getGlobalPlayer).filter(Boolean);
-        
+
         // Vytvoříme HTML element pro renderování
         const pdfContent = document.createElement('div');
         pdfContent.style.width = '210mm';
@@ -1485,12 +1507,12 @@ document.addEventListener('DOMContentLoaded', () => {
         pdfContent.style.position = 'absolute';
         pdfContent.style.top = '-9999px';
         pdfContent.style.left = '0';
-        
+
         let html = `
             <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">${t.name}</h1>
             <p style="font-size: 12px; color: #666; margin-bottom: 5px;">Datum vytvoření: ${t.createdAt ? formatDate(t.createdAt) : 'Neznámé'}</p>
             <p style="font-size: 12px; color: #666; margin-bottom: 20px;">Body k výhře: ${t.pointsToWin}</p>
-            
+
             <h2 style="font-size: 18px; font-weight: bold; margin-top: 20px; margin-bottom: 10px;">Výsledková listina</h2>
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
                 <thead>
@@ -1505,7 +1527,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </thead>
                 <tbody>
         `;
-        
+
         stats.forEach((s, i) => {
             html += `
                 <tr style="border-bottom: 1px solid #eee;">
@@ -1518,28 +1540,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 </tr>
             `;
         });
-        
+
         html += `
                 </tbody>
             </table>
-            
+
             <h2 style="font-size: 18px; font-weight: bold; margin-top: 20px; margin-bottom: 10px;">Vzájemné zápasy</h2>
             <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                 <thead>
                     <tr style="background-color: #f3f4f6;">
                         <th style="padding: 6px; text-align: left; font-weight: bold; border: 1px solid #ddd;"></th>
         `;
-        
+
         players.forEach(p => {
             html += `<th style="padding: 6px; text-align: center; font-weight: bold; border: 1px solid #ddd;">${p.name}</th>`;
         });
-        
+
         html += `
                     </tr>
                 </thead>
                 <tbody>
         `;
-        
+
         players.forEach(p1 => {
             html += `<tr><td style="padding: 6px; font-weight: bold; border: 1px solid #ddd; background-color: #f9fafb;">${p1.name}</td>`;
             players.forEach(p2 => {
@@ -1560,15 +1582,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             html += `</tr>`;
         });
-        
+
         html += `
                 </tbody>
             </table>
         `;
-        
+
         pdfContent.innerHTML = html;
         document.body.appendChild(pdfContent);
-        
+
         // Použijeme html2canvas přímo a pak přidáme obrázek do PDF
         setTimeout(() => {
             html2canvas(pdfContent, {
@@ -1584,19 +1606,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pageHeight = 297; // A4 height in mm
                 const imgHeight = (canvas.height * imgWidth) / canvas.width;
                 let heightLeft = imgHeight;
-                
+
                 let position = 0;
-                
+
                 doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
                 heightLeft -= pageHeight;
-                
+
                 while (heightLeft >= 0) {
                     position = heightLeft - imgHeight;
                     doc.addPage();
                     doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
                     heightLeft -= pageHeight;
                 }
-                
+
                 doc.save(`turnaj_${t.name.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
                 document.body.removeChild(pdfContent);
             }).catch(error => {
@@ -1636,7 +1658,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const displayP1 = m.sidesSwapped ? p2 : p1;
         const displayP2 = m.sidesSwapped ? p1 : p2;
-        
+
         // Použijeme barvy podle pořadí hráče v turnaji
         const p1Color = playerColors[t.playerIds.indexOf(displayP1.id) % playerColors.length];
         const p2Color = playerColors[t.playerIds.indexOf(displayP2.id) % playerColors.length];

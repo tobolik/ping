@@ -417,6 +417,85 @@ if (sidesSwapped) {
 - Používá se `setTimeout` pro zajištění načtení elementu
 - html2canvas vyžaduje viditelný element (i když mimo obrazovku)
 
+### Nastavení aplikace
+
+**Implementace:** `index.html`, `api.php` (akce `saveSettings`, `handleGetData`)
+
+**Dostupná nastavení:**
+- `soundsEnabled` (boolean) - Zapnutí/vypnutí zvukových efektů
+- `voiceAssistEnabled` (boolean) - Zapnutí/vypnutí hlasového asistenta
+- `motivationalPhrasesEnabled` (boolean) - Zapnutí/vypnutí motivačních hlášek
+- `showLockedTournaments` (boolean) - Zobrazení/skrytí zamčených turnajů
+
+**Frontend implementace:**
+- Nastavení jsou dostupná v hlavním menu aplikace (ozubené kolečko)
+- Během zápasu jsou dostupná tlačítka pro rychlé zapnutí/vypnutí hlasového asistenta, motivačních hlášek a zvuků
+- Ikony pro hlasový asistent jsou sjednocené: `fa-comment-dots` (zapnuto) a `fa-comment-slash` (vypnuto)
+
+**Backend implementace:**
+- Nastavení se ukládají do tabulky `settings` s temporal versioning
+- Při ukládání se zneplatní starý záznam (`valid_to = NOW()`) a vytvoří se nový
+- Při načítání se vybírá pouze nejnovější záznam pro každé nastavení pomocí subquery s `MAX(entity_id)`
+
+**Důležité SQL dotaz pro načítání nastavení:**
+```sql
+SELECT s1.setting_key, s1.setting_value 
+FROM settings s1
+INNER JOIN (
+    SELECT setting_key, MAX(entity_id) as max_entity_id
+    FROM settings
+    WHERE valid_to IS NULL
+    GROUP BY setting_key
+) s2 ON s1.setting_key = s2.setting_key AND s1.entity_id = s2.max_entity_id
+WHERE s1.valid_to IS NULL
+```
+
+**State management:**
+```javascript
+state.settings = {
+    soundsEnabled: true,
+    voiceAssistEnabled: false,
+    showLockedTournaments: false,
+    motivationalPhrasesEnabled: true,
+    ...(data.settings || {})
+};
+```
+
+**Frontend akce:**
+- `toggle-sound` - Přepne zvuky
+- `toggle-voice-assist` - Přepne hlasový asistent (v menu)
+- `toggle-voice-assist-ingame` - Přepne hlasový asistent (během zápasu)
+- `toggle-motivational-phrases` - Přepne motivační hlášky (v menu)
+- `toggle-motivational-phrases-ingame` - Přepne motivační hlášky (během zápasu)
+- `toggle-show-locked` - Přepne zobrazení zamčených turnajů
+
+### Hlasový asistent
+
+**Implementace:** `index.html`, funkce `speak(text, force = false)`
+
+**Technologie:**
+- Web Speech API (`window.speechSynthesis`)
+- Jazyk: čeština (`cs-CZ`)
+- Automatické rušení předchozího hlášení před novým
+
+**Hlášení během zápasu:**
+- **Formát:** `"${servingPlayer.name}, ${servingPlayerScore} : ${otherPlayerScore}"`
+- **Příklad:** "Jan, 5 : 3" (místo původního "5 : 3, podání Jan")
+- **Motivační hlášky:** Pokud jsou zapnuté (`motivationalPhrasesEnabled`), přidá se náhodná hláška s pravděpodobností 40%
+
+**Motivační hlášky:**
+- Pole `encouragingPhrases` obsahuje 20 různých hlášek
+- Příklad: "Pojď, draku!", "To byl úder!", "Skvělá práce!", atd.
+- Přidávají se za skóre: `speechText += `, ${randomPhrase}``
+
+**Hlášení konce zápasu:**
+- Formát: `"Konec zápasu. Vítěz ${winner.name}. ${winnerScore} : ${loserScore}"`
+
+**Důležité:**
+- Hlášení se provádí pouze pokud je `state.settings.voiceAssistEnabled === true`
+- Před každým hlášením se volá `synth.cancel()` pro zrušení předchozího hlášení
+- Každé hlášení vytváří novou instanci `SpeechSynthesisUtterance`
+
 ## 🔑 Klíčové konvence
 
 ### Temporal Versioning
@@ -596,4 +675,6 @@ grep -r "case '" api.php
 8. **Unikátní názvy turnajů:** Při vytváření turnaje vždy použij `generateUniqueTournamentName()` pro zajištění unikátnosti
 9. **Barvy hráčů:** Vždy používej `playerColors[t.playerIds.indexOf(playerId) % playerColors.length]` pro konzistentní barvy
 10. **Klávesové zkratky:** Při přidávání nových zkratek zkontroluj, že nejsou v konfliktu s existujícími a že respektují podmínky aktivace
+11. **Načítání nastavení:** Vždy používej subquery s `MAX(entity_id)` pro výběr pouze nejnovějších záznamů nastavení
+12. **Hlasový asistent:** Před každým hlášením vždy zavolej `synth.cancel()` pro zrušení předchozího hlášení
 

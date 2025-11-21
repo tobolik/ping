@@ -206,6 +206,36 @@ Aplikace umožňuje exportovat statistiky turnaje do různých formátů:
 - PDF export používá html2canvas a jsPDF pro renderování HTML do PDF
 - Soubory se stahují s názvem obsahujícím název turnaje a datum
 
+### Nastavení aplikace
+
+Aplikace umožňuje přizpůsobit chování pomocí nastavení dostupných v menu (ozubené kolečko v pravém horním rohu):
+
+- **Zvuky** - Zapnutí/vypnutí zvukových efektů při přidávání bodů
+- **Hlas** - Zapnutí/vypnutí hlasového asistenta, který hlásí skóre a další informace
+- **Motivační hlášky** - Zapnutí/vypnutí náhodných motivačních hlášek během zápasu
+- **Zobrazit zamčené turnaje** - Zobrazení/skrytí zamčených turnajů v seznamu turnajů
+
+**Dostupnost nastavení:**
+- Všechna nastavení jsou dostupná v hlavním menu aplikace
+- Během zápasu jsou dostupná tlačítka pro rychlé zapnutí/vypnutí hlasového asistenta, motivačních hlášek a zvuků
+
+**Uložení nastavení:**
+- Všechna nastavení se automaticky ukládají do databáze
+- Nastavení jsou trvalá a zachovávají se mezi relacemi
+
+### Hlasový asistent
+
+Hlasový asistent poskytuje hlasové hlášení během zápasu:
+
+- **Hlášení skóre:** Při každém přidání bodu hlásí jméno hráče s podáním a aktuální skóre (např. "Jan, 5 : 3")
+- **Konec zápasu:** Po ukončení zápasu hlásí vítěze a finální skóre
+- **Motivační hlášky:** Pokud jsou zapnuté, přidává náhodné motivační hlášky s pravděpodobností 40% (např. "Pojď, draku!", "To byl úder!")
+
+**Technické detaily:**
+- Používá Web Speech API (SpeechSynthesis)
+- Jazyk: čeština (cs-CZ)
+- Hlášení se automaticky ruší před novým hlášením, aby se zprávy nekumulovaly
+
 ## 🔌 API
 
 ### Endpoint

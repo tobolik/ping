@@ -86,8 +86,20 @@ function handleSaveSettings($conn, $payload) {
         $dbValue = ($existingSetting['setting_value'] === 'true') ? true : (($existingSetting['setting_value'] === 'false') ? false : $existingSetting['setting_value']);
     }
 
+    // Normalizujeme hodnoty pro porovnání (převod na boolean pro boolean hodnoty)
+    // Pokud záznam neexistuje, $dbValue je null, takže vždy uložíme
+    $shouldSave = false;
+    if (!$existingSetting) {
+        $shouldSave = true;
+    } else {
+        // Normalizujeme hodnoty pro porovnání
+        $normalizedDbValue = is_bool($value) ? (bool)$dbValue : $dbValue;
+        $normalizedValue = is_bool($value) ? (bool)$value : $value;
+        $shouldSave = ($normalizedDbValue !== $normalizedValue);
+    }
+
     // Ukládáme jen pokud je hodnota jiná, nebo pokud záznam neexistuje
-    if (!$existingSetting || $dbValue !== $value) {
+    if ($shouldSave) {
         $entityId = null;
         if ($existingSetting) {
             $entityId = $existingSetting['entity_id'];
@@ -418,7 +430,18 @@ function handleGetData($conn) {
         'tournaments' => []
     ];
 
-    $settingsResult = $conn->query("SELECT setting_key, setting_value FROM settings WHERE valid_to IS NULL");
+    // Načteme jen nejnovější záznamy pro každé nastavení (podle entity_id, protože entity_id se zvyšuje)
+    $settingsResult = $conn->query("
+        SELECT s1.setting_key, s1.setting_value 
+        FROM settings s1
+        INNER JOIN (
+            SELECT setting_key, MAX(entity_id) as max_entity_id
+            FROM settings
+            WHERE valid_to IS NULL
+            GROUP BY setting_key
+        ) s2 ON s1.setting_key = s2.setting_key AND s1.entity_id = s2.max_entity_id
+        WHERE s1.valid_to IS NULL
+    ");
     while ($row = $settingsResult->fetch_assoc()) {
         $value = $row['setting_value'];
         $data['settings'][$row['setting_key']] = ($value === 'true') ? true : (($value === 'false') ? false : $value);
