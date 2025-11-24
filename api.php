@@ -426,7 +426,7 @@ function handleUpdateMatch($conn, $payload) {
     $id = $payload['id'];
     $data = $payload['data'];
     
-    $stmt = $conn->prepare("SELECT score1, score2, completed, first_server, serving_player, sides_swapped, team1_id, team2_id, double_rotation_state FROM matches WHERE entity_id = ? AND valid_to IS NULL");
+    $stmt = $conn->prepare("SELECT tournament_id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, sides_swapped, team1_id, team2_id, match_order, double_rotation_state FROM matches WHERE entity_id = ? AND valid_to IS NULL");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $dbMatch = $stmt->get_result()->fetch_assoc();
@@ -469,24 +469,109 @@ function handleUpdateMatch($conn, $payload) {
         $stmtUpdate->bind_param("i", $id);
         $stmtUpdate->execute();
 
-        $stmtInsert = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, team1_id, team2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped, double_rotation_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmtInsert->bind_param(
-            "iiiiiiiiiiiiiis",
-            $id,
-            $data['tournament_id'],
-            $data['player1Id'],
-            $data['player2Id'],
-            $dataTeam1,
-            $dataTeam2,
-            $data['score1'],
-            $data['score2'],
-            $data['completed'],
-            $dataFirstServer,
-            $dataServingPlayer,
-            $data['match_order'],
-            $dataSidesSwapped,
-            $normalizedRotationState
-        );
+        // Zajistíme, že všechny hodnoty jsou správně definované
+        // Pro player1Id a player2Id musíme použít hodnotu z databáze, pokud není v datech (NOT NULL constraint)
+        $player1Id = isset($data['player1Id']) && $data['player1Id'] !== null ? intval($data['player1Id']) : (isset($dbMatch['player1_id']) ? intval($dbMatch['player1_id']) : 0);
+        $player2Id = isset($data['player2Id']) && $data['player2Id'] !== null ? intval($data['player2Id']) : (isset($dbMatch['player2_id']) ? intval($dbMatch['player2_id']) : 0);
+        $tournamentId = isset($data['tournament_id']) ? intval($data['tournament_id']) : (isset($dbMatch['tournament_id']) ? intval($dbMatch['tournament_id']) : 0);
+        $score1 = isset($data['score1']) ? intval($data['score1']) : (isset($dbMatch['score1']) ? intval($dbMatch['score1']) : 0);
+        $score2 = isset($data['score2']) ? intval($data['score2']) : (isset($dbMatch['score2']) ? intval($dbMatch['score2']) : 0);
+        $completed = isset($data['completed']) ? ($data['completed'] ? 1 : 0) : (isset($dbMatch['completed']) ? intval($dbMatch['completed']) : 0);
+        $matchOrder = isset($data['match_order']) ? intval($data['match_order']) : (isset($dbMatch['match_order']) ? intval($dbMatch['match_order']) : 0);
+        
+        // Pro NULL hodnoty v integer sloupcích musíme použít dynamický SQL dotaz
+        // Sestavíme SQL dotaz s podmínkami pro NULL hodnoty
+        $sql = "INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, team1_id, team2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped, double_rotation_state) VALUES (?, ?, ?, ?, ";
+        
+        // Pro team1_id a team2_id použijeme podmínky
+        if ($dataTeam1 !== null) {
+            $sql .= "?, ";
+        } else {
+            $sql .= "NULL, ";
+        }
+        if ($dataTeam2 !== null) {
+            $sql .= "?, ";
+        } else {
+            $sql .= "NULL, ";
+        }
+        
+        $sql .= "?, ?, ?, ";
+        
+        // Pro first_server a serving_player použijeme podmínky
+        if ($dataFirstServer !== null) {
+            $sql .= "?, ";
+        } else {
+            $sql .= "NULL, ";
+        }
+        if ($dataServingPlayer !== null) {
+            $sql .= "?, ";
+        } else {
+            $sql .= "NULL, ";
+        }
+        
+        $sql .= "?, ?, ?)";
+        
+        $stmtInsert = $conn->prepare($sql);
+        if (!$stmtInsert) {
+            error_log("handleUpdateMatch: Chyba při přípravě INSERT dotazu: " . $conn->error);
+            throw new Exception("Chyba při přípravě dotazu: " . $conn->error);
+        }
+        
+        // Sestavíme typy a parametry podle podmínek (musíme použít reference)
+        $types = "iiii";
+        $bindId = $id;
+        $bindTournamentId = $tournamentId;
+        $bindPlayer1Id = $player1Id;
+        $bindPlayer2Id = $player2Id;
+        
+        $bindParams = [&$types, &$bindId, &$bindTournamentId, &$bindPlayer1Id, &$bindPlayer2Id];
+        
+        if ($dataTeam1 !== null) {
+            $types .= "i";
+            $bindTeam1Id = intval($dataTeam1);
+            $bindParams[] = &$bindTeam1Id;
+        }
+        if ($dataTeam2 !== null) {
+            $types .= "i";
+            $bindTeam2Id = intval($dataTeam2);
+            $bindParams[] = &$bindTeam2Id;
+        }
+        
+        $types .= "iii";
+        $bindScore1 = $score1;
+        $bindScore2 = $score2;
+        $bindCompleted = $completed;
+        $bindParams[] = &$bindScore1;
+        $bindParams[] = &$bindScore2;
+        $bindParams[] = &$bindCompleted;
+        
+        if ($dataFirstServer !== null) {
+            $types .= "i";
+            $bindFirstServer = intval($dataFirstServer);
+            $bindParams[] = &$bindFirstServer;
+        }
+        if ($dataServingPlayer !== null) {
+            $types .= "i";
+            $bindServingPlayer = intval($dataServingPlayer);
+            $bindParams[] = &$bindServingPlayer;
+        }
+        
+        $types .= "iis";
+        $bindMatchOrder = $matchOrder;
+        $bindSidesSwapped = $dataSidesSwapped;
+        $bindRotationState = $normalizedRotationState;
+        $bindParams[] = &$bindMatchOrder;
+        $bindParams[] = &$bindSidesSwapped;
+        $bindParams[] = &$bindRotationState;
+        
+        // Použijeme call_user_func_array pro bind_param s dynamickým počtem parametrů
+        $bindResult = call_user_func_array([$stmtInsert, 'bind_param'], $bindParams);
+        
+        if (!$bindResult) {
+            error_log("handleUpdateMatch: Chyba při bind_param: " . $stmtInsert->error);
+            throw new Exception("Chyba při bind_param: " . $stmtInsert->error);
+        }
+        
         if (!$stmtInsert->execute()) {
             error_log("handleUpdateMatch: Chyba při vkládání nové verze zápasu: " . $stmtInsert->error);
             throw new Exception("Chyba při aktualizaci zápasu: " . $stmtInsert->error);

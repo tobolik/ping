@@ -354,6 +354,7 @@ last_sync (TIMESTAMP)
 - **Inteligentní názvy:** Pokud turnaj obsahuje dnešní datum, použije se stávající logika s číslem. Pokud obsahuje starší datum, použije se dnešní datum v názvu
 - Používá funkci `generateUniqueTournamentName()` pro generování unikátního názvu
 - **Respektuje formát turnaje** – typ (`single`/`double`) a pořadí hráčů se kopíruje 1:1. U čtyřher jsou automaticky vytvořeny stejné dvojice a všechny nové zápasy mají `sidesSwapped = true`.
+- **Pro čtyřhru:** Při kopírování turnaje čtyřhry se otočí pořadí hráčů v rámci každého týmu (např. Tým A [A1, A2] → [A2, A1], Tým B [B1, B2] → [B2, B1]), aby se změnilo pořadí podání z A1, B1, A2, B2 na B2, A2, B1, A1. Týmy zůstávají stejné (první polovina = tým A, druhá polovina = tým B).
 
 ### Čtyřhry (doubles)
 
@@ -369,7 +370,7 @@ last_sync (TIMESTAMP)
   - V nastavení turnaje se zobrazuje formát a limit hráčů (8 vs 16); při čtyřhře se aplikuje kontrola sudého počtu.
   - Scoreboard zobrazuje názvy týmů (`Honza + Petr`) a seznam jednotlivých hráčů pod názvem.
   - Modální okno „Kdo má první podání?“ u čtyřhry nabízí výběr týmu (ne konkrétního hráče).
-  - Při kopírování turnaje se zachovají dvojice a pro každý zápas se automaticky nastaví `sidesSwapped = true`.
+  - Při kopírování turnaje se zachovají dvojice a pro každý zápas se automaticky nastaví `sidesSwapped = true`. Navíc se otočí pořadí hráčů v rámci každého týmu, aby se změnilo pořadí podání.
 - Statistiky:
   - Detail turnaje (stats screen) obsahuje kromě hráčského žebříčku také týmovou tabulku (pokud je turnaj typu double).
   - Celkové statistiky (`overall-stats-screen`) zobrazují kromě hráčů i agregované výsledky týmů napříč všemi čtyřhrami (identifikace podle seřazené dvojice hráčů).

@@ -127,6 +127,7 @@ Aplikace umožňuje rychlé kopírování turnaje pro pokračování s novým tu
 
 - **Speciální funkce:**
   - Automatické prohození stran hráčů (hráči, kteří hráli vlevo, budou vpravo a naopak)
+  - **Pro čtyřhru:** Při kopírování turnaje čtyřhry se navíc otočí pořadí hráčů v rámci každého týmu, aby se změnilo pořadí podání (např. z A1, B1, A2, B2 na B2, A2, B1, A1)
   - Nový turnaj je připraven k okamžitému spuštění
   - **Inteligentní názvy:** Pokud turnaj obsahuje dnešní datum, použije se stávající logika s číslem. Pokud obsahuje starší datum, použije se dnešní datum v názvu (např. "Turnaj 20. 11. 2025")
 
