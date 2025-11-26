@@ -84,6 +84,12 @@
   - ✅ Vytvoření nového turnaje se stejným názvem + číslo
   - ✅ Zkopírování všech hráčů
   - ✅ Automatické prohození stran hráčů
+- ✅ Čtyřhra (doubles)
+  - ✅ Přepínač formátu při založení turnaje + validace počtu hráčů (singl 2–8, double 4–16)
+  - ✅ Automatické párování hráčů do týmů (tournament_teams) a týmové zápasy (`team1_id`/`team2_id`)
+  - ✅ Oficiální střídání podání A1 → B1 → A2 → B2 (bloky 2/5 bodů, po 10:10 resp. 20:20 střídání po jednom)
+  - ✅ Scoreboard a modály zobrazují názvy týmů „Honza + Petr“
+  - ✅ Statistiky (detail turnaje i celkové) obsahují týmové žebříčky a agregace
 
 ### Ukládání a persistence
 - ✅ Databázová verze (MySQL/MariaDB)
@@ -122,7 +128,7 @@
 
 ### Budoucí rozšíření (podle zadání)
 - ✅ Export dat do CSV/PDF (implementováno)
-- ❌ Celkové statistiky napříč všemi turnaji
+- ✅ Celkové statistiky napříč všemi turnaji (hráči + týmové agregace)
 - ❌ Grafy výkonu v čase
 - ❌ Porovnání hráčů různými metrikami
 - ❌ Turnajové formáty:
@@ -139,7 +145,8 @@
 ## 📝 Poznámky
 
 - Většina základních a pokročilých funkcí je implementována
-- Chybí hlavně export funkcionalita a pokročilé turnajové formáty
+- Nově je k dispozici kompletní režim čtyřhry (týmy, servis, statistiky) i agregace týmů napříč turnaji
+- Nadále chybí pokročilé turnajové formáty a vizualizace trendů
 - Aplikace je plně funkční pro základní použití
 - Databázová verze je implementována s temporal versioning patternem
 
