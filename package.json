@@ -4,8 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "cypress:open": "cypress open"
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "cypress run",
+    "test:e2e:open": "cypress open",
+    "test:all": "npm run test:unit && npm run test:e2e"
   },
   "repository": {
     "type": "git",
@@ -19,6 +25,10 @@
   },
   "homepage": "https://github.com/tobolik/ping#readme",
   "devDependencies": {
-    "cypress": "^15.3.0"
+    "cypress": "^15.3.0",
+    "vitest": "^1.0.0",
+    "@vitest/ui": "^1.0.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "jsdom": "^23.0.0"
   }
 }
