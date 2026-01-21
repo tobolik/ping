@@ -4,9 +4,9 @@ Tento dokument poskytuje AI agentům kompletní přehled o struktuře projektu, 
 
 ## 📋 Přehled projektu
 
-**Název:** Ping Pong Turnajová Aplikace  
-**Typ:** Webová aplikace (Frontend + Backend API)  
-**Stack:** PHP (Backend), HTML/JavaScript (Frontend), MySQL/MariaDB (Databáze)  
+**Název:** Ping Pong Turnajová Aplikace
+**Typ:** Webová aplikace (Frontend + Backend API)
+**Stack:** PHP (Backend), HTML/JavaScript (Frontend), MySQL/MariaDB (Databáze)
 **Architektura:** RESTful API, Temporal Versioning Pattern
 
 ## 🏗️ Architektura
@@ -143,8 +143,8 @@ last_sync (TIMESTAMP)
 
 ### Endpoint
 
-**URL:** `api.php`  
-**Content-Type:** `application/json`  
+**URL:** `api.php`
+**Content-Type:** `application/json`
 **CORS:** Povoleno pro všechny domény (`Access-Control-Allow-Origin: *`)
 
 ### GET Request
@@ -215,6 +215,7 @@ last_sync (TIMESTAMP)
 - Akce `create-tournament` automaticky kontroluje unikátnost názvu pomocí `generateUniqueTournamentName()`
 - Pokud název už existuje, automaticky se přidá číslo v závorce
 - Formát data: `YYYY-MM-DD HH:MM:SS` (MySQL formát, ne ISO 8601)
+- **Výběr hráčů:** Funkce `setupAutocomplete()` zobrazuje seznam hráčů okamžitě při kliknutí do inputu (maximálně 10 hráčů). Seznam se automaticky filtruje při psaní. Hráči, kteří už jsou v turnaji, se nezobrazují.
 
 #### Akce: `updateTournament`
 
@@ -491,7 +492,7 @@ if (sidesSwapped) {
 
 **Důležité SQL dotaz pro načítání nastavení:**
 ```sql
-SELECT s1.setting_key, s1.setting_value 
+SELECT s1.setting_key, s1.setting_value
 FROM settings s1
 INNER JOIN (
     SELECT setting_key, MAX(entity_id) as max_entity_id
@@ -520,6 +521,7 @@ state.settings = {
 - `toggle-motivational-phrases` - Přepne motivační hlášky (v menu)
 - `toggle-motivational-phrases-ingame` - Přepne motivační hlášky (během zápasu)
 - `toggle-show-locked` - Přepne zobrazení zamčených turnajů
+- `show-locked-tournaments` - Zobrazí zamčené turnaje (používá se v prázdném stavu, když existují zamčené turnaje)
 
 ### Hlasový asistent
 
@@ -533,12 +535,15 @@ state.settings = {
 **Hlášení během zápasu:**
 - **Formát:** `"${servingPlayer.name}, ${servingPlayerScore} : ${otherPlayerScore}"`
 - **Příklad:** "Jan, 5 : 3" (místo původního "5 : 3, podání Jan")
-- **Motivační hlášky:** Pokud jsou zapnuté (`motivationalPhrasesEnabled`), přidá se náhodná hláška s pravděpodobností 40%
+- **Motivační hlášky:** Pokud jsou zapnuté (`motivationalPhrasesEnabled`), přidá se náhodná hláška vždy při každém bodu. Hlášky jsou inteligentně vybírány podle situace ve hře.
 
 **Motivační hlášky:**
-- Pole `encouragingPhrases` obsahuje 20 různých hlášek
-- Příklad: "Pojď, draku!", "To byl úder!", "Skvělá práce!", atd.
-- Přidávají se za skóre: `speechText += `, ${randomPhrase}``
+- Pole `encouragingPhrases` je objekt rozdělený do kategorií:
+  - `general` - Obecné hlášky vhodné kdykoliv během zápasu (např. "Pojď, draku!", "To byl úder!", "Paráda!")
+  - `nearEnd` - Hlášky pro blízký konec zápasu, když jeden hráč potřebuje 1-2 body k vítězství (např. "Ještě jeden!", "Téměř tam!", "Poslední bod!")
+  - `afterLoss` - Hlášky pro situaci, kdy hráč prohrál bod (pro budoucí použití)
+- Výběr hlášky: Pokud je zápas blízko konce (jeden hráč potřebuje 1-2 body), vybere se z `nearEnd`, jinak z `general`
+- Přidávají se za skóre: `speechText += `, ${selectedPhrase}``
 
 **Hlášení konce zápasu:**
 - Formát: `"Konec zápasu. Vítěz ${winner.name}. ${winnerScore} : ${loserScore}"`
@@ -610,11 +615,11 @@ KEY `idx_name` (`name`(191))
 
 **Řešení:** Použij formát MySQL datetime (`YYYY-MM-DD HH:MM:SS`), ne ISO 8601:
 ```javascript
-const mysqlDate = now.getFullYear() + '-' + 
-    String(now.getMonth() + 1).padStart(2, '0') + '-' + 
-    String(now.getDate()).padStart(2, '0') + ' ' + 
-    String(now.getHours()).padStart(2, '0') + ':' + 
-    String(now.getMinutes()).padStart(2, '0') + ':' + 
+const mysqlDate = now.getFullYear() + '-' +
+    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+    String(now.getDate()).padStart(2, '0') + ' ' +
+    String(now.getHours()).padStart(2, '0') + ':' +
+    String(now.getMinutes()).padStart(2, '0') + ':' +
     String(now.getSeconds()).padStart(2, '0');
 ```
 
@@ -630,6 +635,13 @@ const mysqlDate = now.getFullYear() + '-' +
 ### Generování unikátních názvů turnajů
 
 **Funkce:** `generateUniqueTournamentName(baseName, excludeTournamentId = null)`
+
+**Vylepšená logika:**
+- Odstraní případné číslo v závorce z `baseName` (např. "Turnaj (2)" → "Turnaj")
+- Zkontroluje všechny existující názvy turnajů (kromě `excludeTournamentId`)
+- Najde všechna čísla v závorkách, která už existují pro daný základní název
+- Vrátí základní název, pokud neexistuje, nebo najde nejmenší volné číslo pro závorku
+- Tím zajišťuje, že i při kopírování turnaje s názvem obsahujícím závorku se vytvoří unikátní název
 
 **Implementace:** `index.html`
 
@@ -663,7 +675,7 @@ const uniqueName = generateUniqueTournamentName("Turnaj");
 
 **Pole barev:**
 ```javascript
-const playerColors = ["bg-red-500", "bg-blue-500", "bg-green-500", "bg-purple-500", 
+const playerColors = ["bg-red-500", "bg-blue-500", "bg-green-500", "bg-purple-500",
                       "bg-yellow-500", "bg-pink-500", "bg-indigo-500", "bg-teal-500"];
 ```
 
@@ -713,7 +725,28 @@ grep -r "case '" api.php
 - `ping3.sql` - Kompletní databázové schéma
 - `config/config.php` - Konfigurace a načítání .env
 - `.env.example` - Šablona pro environment proměnné
-- `STATUS_IMPLEMENTACE.md` - Přehled implementovaných funkcí
+
+## 📖 Dokumentace
+
+Všechna dokumentace je umístěna ve složce `/docs`:
+
+### Testování
+- **[MANUAL_TEST_SUITE.md](docs/MANUAL_TEST_SUITE.md)** - Kompletní sada manuálních testů (52 testů)
+- **[TESTING_SOLUTION.md](docs/TESTING_SOLUTION.md)** - Řešení problému s dynamickými `aria-ref` atributy
+- **[TESTING_HELPERS.md](docs/TESTING_HELPERS.md)** - Helper funkce pro automatizované testování
+- **[TESTING_QUICK_REFERENCE.md](docs/TESTING_QUICK_REFERENCE.md)** - Rychlý referenční průvodce pro testování
+- **[TESTING_BROWSER_TOOLS_GUIDE.md](docs/TESTING_BROWSER_TOOLS_GUIDE.md)** - Průvodce používáním Browser nástrojů
+- **[MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md)** - Průvodce rychlým manuálním testováním
+- **[TESTING_IMPROVEMENTS.md](docs/TESTING_IMPROVEMENTS.md)** - Detailní návrhy na zlepšení testování
+
+### Implementace a plánování
+- **[MISSING_IMPLEMENTATIONS.md](docs/MISSING_IMPLEMENTATIONS.md)** - Seznam chybějících implementací v UI
+- **[TEST_SWAP_SIDES.md](docs/TEST_SWAP_SIDES.md)** - Dokumentace k funkci prohození stran
+- **[REFACTORING_PLAN.md](docs/REFACTORING_PLAN.md)** - Plán refaktoringu
+- **[STATUS_IMPLEMENTACE.md](docs/STATUS_IMPLEMENTACE.md)** - Status implementace funkcionalit
+
+### Instalace
+- **[INSTALACE_NODEJS.md](docs/INSTALACE_NODEJS.md)** - Instalační průvodce pro Node.js
 
 ## ⚠️ Důležité upozornění
 
