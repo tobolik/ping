@@ -1,0 +1,154 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        html, body { height: 100%; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        #app { height: 100%; }
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0.6);
+            display: flex; align-items: center; justify-content: center; z-index: 50;
+            animation: fadeIn 0.2s ease;
+            pointer-events: auto;
+        }
+        /* Zlepšení pro testování - backdrop neblokuje kliky na pozadí, pouze na modal content */
+        .modal-backdrop::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+        .modal-content {
+            background: white; padding: 1.5rem; border-radius: 0.75rem;
+            width: 95vw; max-width: 500px;
+            animation: slideUp 0.3s ease-out;
+            max-height: 90vh; overflow-y: auto;
+            pointer-events: auto;
+            position: relative;
+            z-index: 1;
+        }
+        .modal-content.modal-lg { max-width: 800px; }
+        .btn {
+            display: inline-block; padding: 0.75rem 1.5rem; border-radius: 0.5rem;
+            font-weight: 600; text-align: center; cursor: pointer;
+            transition: all 0.2s; white-space: nowrap;
+        }
+        .btn:disabled { background-color: #d1d5db; cursor: not-allowed; color: #6b7280; }
+        .btn-primary { background-color: #22c55e; color: white; }
+        .btn-primary:hover:not(:disabled) { background-color: #16a34a; }
+        .btn-secondary { background-color: #e5e7eb; color: #374151; }
+        .btn-secondary:hover:not(:disabled) { background-color: #d1d5db; }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .btn-danger:hover:not(:disabled) { background-color: #dc2626; }
+        .player-score-box.active-pointer:active { transform: scale(0.99); }
+        .autocomplete-suggestions {
+            position: absolute; background: white; border: 1px solid #d1d5db; border-top: none;
+            border-radius: 0 0 0.5rem 0.5rem; z-index: 100; max-height: 150px; overflow-y: auto;
+            left: 0; right: 0;
+        }
+        .autocomplete-suggestion { padding: 0.5rem 1rem; cursor: pointer; }
+        .autocomplete-suggestion.highlighted { background-color: #f3f4f6; }
+        .settings-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 0.5rem);
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 40;
+            overflow: hidden;
+        }
+        .settings-menu button, .settings-menu label {
+            display: block;
+            width: 100%;
+            padding: 0.75rem 1.5rem;
+            text-align: left;
+            white-space: nowrap;
+        }
+        .settings-menu button:hover, .settings-menu label:hover {
+            background-color: #f3f4f6;
+        }
+        #sound-toggle:checked ~ .toggle-checkbox { background-color: #22c55e; }
+        #sound-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
+        #voice-assist-toggle:checked ~ .toggle-checkbox { background-color: #22c55e; }
+        #voice-assist-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
+        #show-locked-toggle:checked ~ .toggle-checkbox { background-color: #22c55e; }
+        #show-locked-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
+        #motivational-phrases-toggle:checked ~ .toggle-checkbox { background-color: #22c55e; }
+        #motivational-phrases-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
+
+        @media (max-width: 768px) {
+            html:has(body.game-active) {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                overflow: hidden !important;
+            }
+            body.game-active {
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: hidden !important;
+                width: 100vw !important;
+                height: 100vh !important;
+            }
+            body.game-active #app {
+                padding: 0 !important;
+                margin: 0 !important;
+                max-width: none !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                overflow: hidden !important;
+            }
+            body.game-active #game-screen {
+                height: 100vh !important;
+                width: 100vw !important;
+                max-width: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+            }
+            body.game-active #game-screen > div {
+                width: 100% !important;
+                height: 100vh !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                max-width: none !important;
+            }
+            body.game-active #game-screen .player-score-box {
+                min-height: 0 !important;
+            }
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* PDF Export Styles */
+        .pdf-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+        .pdf-meta { font-size: 12px; color: #666; margin-bottom: 5px; }
+        .pdf-meta-last { font-size: 12px; color: #666; margin-bottom: 20px; }
+        .pdf-section-title { font-size: 18px; font-weight: bold; margin-top: 20px; margin-bottom: 10px; }
+        .pdf-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        .pdf-table-small { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .pdf-table-header { background-color: #f3f4f6; border-bottom: 2px solid #ddd; }
+        .pdf-table-header th { padding: 8px; text-align: left; font-weight: bold; }
+        .pdf-table-header th.pdf-table-cell-center { text-align: center !important; }
+        .pdf-table-row { border-bottom: 1px solid #eee; }
+        .pdf-table-cell { padding: 8px; }
+        .pdf-table-cell-center { padding: 8px; text-align: center; }
+        .pdf-table-cell-bold { padding: 8px; font-weight: bold; }
+        .pdf-wins { padding: 8px; text-align: center; color: #16a34a; font-weight: bold; }
+        .pdf-losses { padding: 8px; text-align: center; color: #dc2626; }
+        .pdf-success-rate { padding: 8px; text-align: center; font-weight: 600; }
+        .pdf-matrix-header { background-color: #f3f4f6; }
+        .pdf-matrix-header th { padding: 6px; font-weight: bold; border: 1px solid #ddd; }
+        .pdf-matrix-header th:first-child { text-align: left; }
+        .pdf-matrix-header th:not(:first-child) { text-align: center; }
+        .pdf-matrix-row-label { padding: 6px; font-weight: bold; border: 1px solid #ddd; background-color: #f9fafb; }
+        .pdf-matrix-cell { padding: 6px; text-align: center; border: 1px solid #ddd; }
+        .pdf-matrix-cell-empty { padding: 6px; text-align: center; border: 1px solid #ddd; background-color: #e5e7eb; }
+        .pdf-matrix-cell-unknown { padding: 6px; text-align: center; border: 1px solid #ddd; color: #9ca3af; }

@@ -1,9 +1,18 @@
 # Sensitive configuration files
 api/config.php
+config/config.php
+.env.localhost
+.env.production
+.env
 
 # IDE specific files
 .idea/
 .vscode/
+*.code-workspace
+
+# Test/development copies
+1/
+2/
 
 # OS specific files
 .DS_Store
