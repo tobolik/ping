@@ -1,8 +1,15 @@
 <?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+function log_message($message) {
+    file_put_contents('debug.log', date('Y-m-d H:i:s') . ' - ' . $message . "\n", FILE_APPEND);
+}
 
 $config = require 'config/config.php';
 
@@ -22,6 +29,9 @@ if ($method === 'GET') {
 
 if ($method === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
+    log_message("--- POST Request Received ---");
+    log_message("Input data: " . json_encode($input));
+
     $action = $input['action'] ?? null;
     $payload = $input['payload'] ?? null;
 
@@ -130,46 +140,54 @@ function handleReorderMatches($conn, $payload) {
 }
 
 function handleSwapSides($conn, $payload) {
+    log_message("--- handleSwapSides START ---");
     $matchId = $payload['matchId'] ?? null;
-    if (!$matchId) return;
+    log_message("Payload matchId: " . json_encode($matchId));
+    if (!$matchId) {
+        log_message("Error: matchId is null.");
+        return;
+    }
     $matchId = intval($matchId);
 
-    // 1. Najdeme aktuální záznam
-    $stmt = $conn->prepare("SELECT tournament_id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped FROM matches WHERE entity_id = ? AND valid_to IS NULL");
+    // 1. Find the current record
+    $sql_select = "SELECT tournament_id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped FROM matches WHERE entity_id = ? AND valid_to IS NULL";
+    log_message("Preparing SELECT: " . $sql_select . " with param: " . $matchId);
+    $stmt = $conn->prepare($sql_select);
     $stmt->bind_param("i", $matchId);
     $stmt->execute();
     $dbMatch = $stmt->get_result()->fetch_assoc();
+    log_message("SELECT result: " . json_encode($dbMatch));
 
     if ($dbMatch) {
-        // 2. Zneplatníme starý záznam
-        $stmtUpdate = $conn->prepare("UPDATE matches SET valid_to = NOW() WHERE entity_id = ? AND valid_to IS NULL");
+        // 2. Invalidate the old record
+        $sql_update = "UPDATE matches SET valid_to = NOW() WHERE entity_id = ? AND valid_to IS NULL";
+        log_message("Preparing UPDATE: " . $sql_update . " with param: " . $matchId);
+        $stmtUpdate = $conn->prepare($sql_update);
         $stmtUpdate->bind_param("i", $matchId);
         $stmtUpdate->execute();
+        log_message("UPDATE affected rows: " . $stmtUpdate->affected_rows);
 
-        // 3. Vložíme nový záznam s prohozenou hodnotou
-        $newSidesSwapped = !$dbMatch['sides_swapped'];
-        $stmtInsert = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmtInsert->bind_param("iiiiiiiiiii", 
-            $matchId, 
-            $dbMatch['tournament_id'], 
-            $dbMatch['player1_id'], 
-            $dbMatch['player2_id'], 
-            $dbMatch['score1'], 
-            $dbMatch['score2'], 
-            $dbMatch['completed'], 
-            $dbMatch['first_server'], 
-            $dbMatch['serving_player'], 
-            $dbMatch['match_order'], 
-            $newSidesSwapped
-        );
+        // 3. Insert the new record with the swapped value
+        $newSidesSwapped = 1 - intval($dbMatch['sides_swapped']);
+        log_message("New sidesSwapped value will be: " . $newSidesSwapped);
+        $sql_insert = "INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $params = [$matchId, $dbMatch['tournament_id'], $dbMatch['player1_id'], $dbMatch['player2_id'], $dbMatch['score1'], $dbMatch['score2'], $dbMatch['completed'], $dbMatch['first_server'], $dbMatch['serving_player'], $dbMatch['match_order'], $newSidesSwapped];
+        log_message("Preparing INSERT: " . $sql_insert . " with params: " . json_encode($params));
+        
+        $stmtInsert = $conn->prepare($sql_insert);
+        $stmtInsert->bind_param("iiiiiiiiiii", ...$params);
         $stmtInsert->execute();
+        log_message("INSERT affected rows: " . $stmtInsert->affected_rows);
+    } else {
+        log_message("No valid match found for entity_id: " . $matchId);
     }
+    log_message("--- handleSwapSides END ---");
 }
 
 function handleCreateTournament($conn, $payload) {
     $tournamentEntityId = getNextEntityId($conn, 'tournaments');
-    $stmt = $conn->prepare("INSERT INTO tournaments (entity_id, name, points_to_win, valid_from) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("isis", $tournamentEntityId, $payload['name'], $payload['pointsToWin'], $payload['createdAt']);
+    $stmt = $conn->prepare("INSERT INTO tournaments (entity_id, name, points_to_win, valid_from) VALUES (?, ?, ?, NOW())");
+    $stmt->bind_param("isi", $tournamentEntityId, $payload['name'], $payload['pointsToWin']);
     $stmt->execute();
 
     $nextTpEntityId = getNextEntityId($conn, 'tournament_players');
@@ -210,8 +228,8 @@ function handleToggleTournamentLock($conn, $payload) {
         $stmtUpdate->bind_param("i", $id);
         $stmtUpdate->execute();
         
-        $stmtInsert = $conn->prepare("INSERT INTO tournaments (entity_id, name, points_to_win, is_locked, valid_from) VALUES (?, ?, ?, ?, ?)");
-        $stmtInsert->bind_param("isiis", $id, $dbTournament['name'], $dbTournament['points_to_win'], $newIsLocked, $dbTournament['valid_from']);
+        $stmtInsert = $conn->prepare("INSERT INTO tournaments (entity_id, name, points_to_win, is_locked, valid_from) VALUES (?, ?, ?, ?, NOW())");
+        $stmtInsert->bind_param("isii", $id, $dbTournament['name'], $dbTournament['points_to_win'], $newIsLocked);
         $stmtInsert->execute();
     }
 }
@@ -230,8 +248,8 @@ function handleUpdateTournament($conn, $payload) {
         $stmtUpdate->bind_param("i", $id);
         $stmtUpdate->execute();
         
-        $stmtInsert = $conn->prepare("INSERT INTO tournaments (entity_id, name, points_to_win, is_locked, valid_from) VALUES (?, ?, ?, ?, ?)");
-        $stmtInsert->bind_param("isiis", $id, $data['name'], $data['pointsToWin'], $data['isLocked'], $data['createdAt']);
+        $stmtInsert = $conn->prepare("INSERT INTO tournaments (entity_id, name, points_to_win, is_locked, valid_from) VALUES (?, ?, ?, ?, NOW())");
+        $stmtInsert->bind_param("isii", $id, $data['name'], $data['pointsToWin'], $data['isLocked']);
         $stmtInsert->execute();
     }
 

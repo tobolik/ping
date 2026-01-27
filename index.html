@@ -66,8 +66,10 @@
         .settings-menu button:hover, .settings-menu label:hover {
             background-color: #f3f4f6;
         }
-        #sound-toggle:checked ~ .toggle-checkbox { background-color: #22c55e; }
-        #sound-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
+        #sound-toggle:checked ~ .toggle-checkbox,
+        #voice-assist-toggle:checked ~ .toggle-checkbox { background-color: #22c55e; }
+        #sound-toggle:checked ~ .toggle-checkbox .toggle-label,
+        #voice-assist-toggle:checked ~ .toggle-checkbox .toggle-label { transform: translateX(100%); }
         
         @media (max-width: 768px) {
             body.game-active, body.game-active #app { padding: 0; margin: 0; max-width: 100vw; height: 100vh; overflow: hidden; }
@@ -117,7 +119,7 @@
 
         <div id="player-db-screen" class="screen space-y-6">
              <header><h1 class="text-3xl font-bold">Databáze hráčů</h1><p class="text-gray-500">Zde spravujete centrální seznam všech hráčů.</p></header>
-            <div class="flex gap-2"><button data-action="show-edit-player-modal" data-id="new" class="btn btn-primary w-full"><i class="fa-solid fa-plus mr-2"></i>Přidat nového hráče</button><button data-action="back-to-main" class="btn btn-secondary w-full">Zpět</button></div>
+            <div class="flex gap-2"><button data-action="show-edit-player-modal" datva-id="new" class="btn btn-primary w-full"><i class="fa-solid fa-plus mr-2"></i>Přidat nového hráče</button><button data-action="back-to-main" class="btn btn-secondary w-full">Zpět</button></div>
             <main id="player-db-list-container" class="space-y-2"></main>
         </div>
         <div id="tournament-screen" class="screen space-y-6">
@@ -142,7 +144,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    let state = { settings: { soundsEnabled: true, voiceAssistEnabled: false }, playerDatabase: [], tournaments: [], activeTournamentId: null, activeMatchId: null };
+    let state = { settings: { soundsEnabled: true, voiceAssistEnabled: false, voiceVolume: 1 }, playerDatabase: [], tournaments: [], activeTournamentId: null, activeMatchId: null };
     const playerColors = ["bg-red-500", "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-yellow-500", "bg-pink-500", "bg-indigo-500", "bg-teal-500"];
     const app = document.getElementById('app');
     const screens = { main: document.getElementById('main-screen'), playerDb: document.getElementById('player-db-screen'), tournament: document.getElementById('tournament-screen'), game: document.getElementById('game-screen'), stats: document.getElementById('stats-screen'), overallStats: document.getElementById('overall-stats-screen') };
@@ -167,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     const updateStateWithApiData = (data) => {
-        state.settings = data.settings || { soundsEnabled: true, voiceAssistEnabled: false };
+        state.settings = data.settings || { soundsEnabled: true, voiceAssistEnabled: false, voiceVolume: 1 };
         state.playerDatabase = data.playerDatabase.map(p => ({
             id: parseInt(p.id, 10),
             name: p.name,
@@ -252,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
         synth.cancel(); 
         let utterance = new SpeechSynthesisUtterance(text); // Vytvoříme novou instanci pro každou hlášku
         utterance.lang = 'cs-CZ';
+        utterance.volume = state.settings.voiceVolume;
         synth.speak(utterance);
     }
     
@@ -566,7 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     let speechText = `${servingPlayerScore} : ${otherPlayerScore}, podání ${servingPlayer.name}`;
                     // S pravděpodobností 40% přidáme náhodnou hlášku
-                    if (Math.random() < 0.4) {
+                    if (Math.random() < 0.9) {
                         const randomPhrase = encouragingPhrases[Math.floor(Math.random() * encouragingPhrases.length)];
                         speechText += `. ${randomPhrase}`;
                     }
@@ -759,7 +762,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderGameBoard();
         },
         'add-point': (target) => updateScore(parseInt(target.dataset.playerId), 1),
-        'subtract-point': (target) => { event.stopPropagation(); updateScore(parseInt(target.dataset.playerId), -1); },
+        'subtract-point': (target, e) => { e.stopPropagation(); updateScore(parseInt(target.dataset.playerId), -1); },
         'suspend-match':()=>{renderTournamentScreen();}, // Pouze se vrací, není třeba ukládat
         'save-match-result': async () => {
             const t = getTournament();
@@ -853,9 +856,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const matchId = target.dataset.id;
             const m = getMatch(t, matchId);
             if (m && !t.isLocked) {
+                // Optimistic update for instant feedback
                 m.sidesSwapped = !m.sidesSwapped;
-                apiCall('swapSides', { matchId: m.id });
                 renderTournamentScreen();
+                // API call to persist the change
+                apiCall('swapSides', { matchId: m.id });
             }
         }
     };
@@ -866,7 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!e.target.closest('#settings-menu') && !e.target.closest('[data-action="toggle-settings-menu"]')) {
             document.getElementById('settings-menu').classList.add('hidden');
         }
-        if (target && allActions[target.dataset.action]) allActions[target.dataset.action](target); 
+        if (target && allActions[target.dataset.action]) allActions[target.dataset.action](target, e); 
     });
     app.addEventListener('change', (e) => {
         const soundToggle = e.target.closest('[data-action="toggle-sound"]');
@@ -881,7 +886,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.settings.voiceAssistEnabled) {
                 // Krátká prodleva, aby se případně stihlo zavřít menu
                 setTimeout(() => speak("Hlasový asistent zapnut."), 100);
+            } else {
+                speak("Hlasový asistent vypnut.", true);
             }
+        }
+    });
+    app.addEventListener('input', (e) => {
+        const volumeSlider = e.target.closest('[data-action="change-voice-volume"]');
+        if (volumeSlider) {
+            const newVolume = parseFloat(volumeSlider.value);
+            state.settings.voiceVolume = newVolume;
+            apiCall('saveSettings', { key: 'voiceVolume', value: newVolume });
+            speak(`Hlasitost ${Math.round(newVolume * 100)} procent`, true);
         }
     });
     document.getElementById('import-file').addEventListener('change', (event) => {
@@ -936,23 +952,28 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p class="text-sm text-gray-500">Hraje se na ${t.pointsToWin} bodů</p>
                         <p class="font-semibold">Podání: ${servingPlayerName}</p>
                     </div>
-                    <div class="w-24 flex justify-end gap-2">
+                    <div class="w-auto flex justify-end gap-2 items-center">
                         <button data-action="toggle-voice-assist-ingame" class="btn btn-secondary !p-0 h-10 w-10 text-lg" title="Zapnout/vypnout hlas">${state.settings.voiceAssistEnabled ? '<i class="fa-solid fa-comment-dots"></i>' : '<i class="fa-solid fa-comment-slash"></i>'}</button>
+                        <input type="range" min="0" max="1" step="0.1" value="${state.settings.voiceVolume}" data-action="change-voice-volume" class="w-24 ${state.settings.voiceAssistEnabled ? '' : 'hidden'}" title="Hlasitost asistenta">
                         <button data-action="toggle-sound-ingame" class="btn btn-secondary !p-0 h-10 w-10 text-lg" title="Zapnout/vypnout zvuky">${state.settings.soundsEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>'}</button>
                     </div>
                 </header>
                 <div class="flex-grow flex flex-col md:flex-row">
                     <div ${canAddPoints ? `data-action="add-point" data-player-id="${p1.id}"` : ''} class="player-score-box bg-red-500 p-4 text-white relative flex flex-col items-center justify-center flex-grow ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
                         ${m.servingPlayer === p1.id ? `<div class="absolute top-4 left-4 w-10 h-10 rounded-full bg-yellow-400/90 text-2xl flex items-center justify-center">🏓</div>` : ''}
-                        <button data-action="subtract-point" data-player-id="${p1.id}" class="absolute top-4 right-4 w-12 h-12 bg-black/20 rounded-full text-2xl">-1</button>
-                        <div class="text-2xl md:text-3xl font-bold">${p1.name}</div>
+                        <div class="flex items-center justify-center gap-2">
+                           <div class="text-2xl md:text-3xl font-bold">${p1.name}</div>
+                           <button data-action="subtract-point" data-player-id="${p1.id}" class="w-10 h-10 bg-black/20 rounded-full text-xl flex-shrink-0">-1</button>
+                        </div>
                         <div class="text-8xl md:text-9xl font-extrabold my-4">${s1}</div>
                         <div class="text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div>
                     </div>
                     <div ${canAddPoints ? `data-action="add-point" data-player-id="${p2.id}"` : ''} class="player-score-box bg-green-500 p-4 text-white relative flex flex-col items-center justify-center flex-grow ${canAddPoints ? 'active-pointer cursor-pointer' : ''}">
                         ${m.servingPlayer === p2.id ? `<div class="absolute top-4 left-4 w-10 h-10 rounded-full bg-yellow-400/90 text-2xl flex items-center justify-center">🏓</div>` : ''}
-                        <button data-action="subtract-point" data-player-id="${p2.id}" class="absolute top-4 right-4 w-12 h-12 bg-black/20 rounded-full text-2xl">-1</button>
-                        <div class="text-2xl md:text-3xl font-bold">${p2.name}</div>
+                        <div class="flex items-center justify-center gap-2">
+                           <div class="text-2xl md:text-3xl font-bold">${p2.name}</div>
+                           <button data-action="subtract-point" data-player-id="${p2.id}" class="w-10 h-10 bg-black/20 rounded-full text-xl flex-shrink-0">-1</button>
+                        </div>
                         <div class="text-8xl md:text-9xl font-extrabold my-4">${s2}</div>
                         <div class="text-sm opacity-80">${canAddPoints ? 'Klepněte pro bod' : '&nbsp;'}</div>
                     </div>
