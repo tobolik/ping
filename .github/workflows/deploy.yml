@@ -1,0 +1,40 @@
+name: Deploy to SFTP
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to SFTP
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: SFTP Deploy
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          username: ${{ secrets.SFTP_USERNAME }}
+          server: ${{ secrets.SFTP_HOST }}
+          port: ${{ secrets.SFTP_PORT }} # volitelné, default 22
+          # ssh_private_key: ${{ secrets.SFTP_KEY }} # pokud používáte klíč
+          password: ${{ secrets.SFTP_PASSWORD }} # pokud používáte heslo (odkomentujte a zakomentujte ssh_private_key)
+          local_path: './'
+          remote_path: ${{ secrets.SFTP_TARGET_DIR }}
+          sftp_only: true
+          args: '-o ConnectTimeout=5'
+          ignore_errors: false
+          # Soubory a složky, které se nemají nahrávat
+          exclude: |
+            .git*
+            .github*
+            node_modules
+            cypress
+            tests
+            docs
+            .env.example
+            README.md
+            package.json
+            package-lock.json
+            vitest.config.js
