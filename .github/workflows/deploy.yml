@@ -13,24 +13,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: SFTP Deploy
-        uses: wangyucode/sftp-upload-action@v2.0.2
+        uses: wangyucode/sftp-upload-action@v3
         with:
           host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USERNAME }}
           password: ${{ secrets.SFTP_PASSWORD }}
-          port: ${{ secrets.SFTP_PORT }} # volitelné, default 22
+          port: ${{ secrets.SFTP_PORT }}
           localDir: '.'
           remoteDir: ${{ secrets.SFTP_TARGET_DIR }}
-          # Exclude ignoruje soubory (glob patterns)
-          exclude: |
-            .git*
-            .github*
-            node_modules
-            cypress
-            tests
-            docs
-            .env.example
-            README.md
-            package.json
-            package-lock.json
-            vitest.config.js
+          # Verze v3 vyžaduje čárkami oddělený seznam
+          exclude: '.git*,.github*,node_modules,cypress,tests,docs,.env.example,README.md,package.json,package-lock.json,vitest.config.js'
