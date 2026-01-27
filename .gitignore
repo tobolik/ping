@@ -8,6 +8,11 @@ config/config.php
 # IDE specific files
 .idea/
 .vscode/
+*.code-workspace
+
+# Test/development copies
+1/
+2/
 
 # OS specific files
 .DS_Store
