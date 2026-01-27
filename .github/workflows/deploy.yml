@@ -12,8 +12,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Remove excluded files
+        run: |
+          rm -rf .git .github node_modules cypress tests docs .env.example README.md package.json package-lock.json vitest.config.js || true
+
       - name: SFTP Deploy
-        uses: wangyucode/sftp-upload-action@v3
+        uses: wangyucode/sftp-upload-action@v2.0.2
         with:
           host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USERNAME }}
@@ -21,5 +25,3 @@ jobs:
           port: ${{ secrets.SFTP_PORT }}
           localDir: '.'
           remoteDir: ${{ secrets.SFTP_TARGET_DIR }}
-          # Verze v3 vyžaduje čárkami oddělený seznam
-          exclude: '.git*,.github*,node_modules,cypress,tests,docs,.env.example,README.md,package.json,package-lock.json,vitest.config.js'
