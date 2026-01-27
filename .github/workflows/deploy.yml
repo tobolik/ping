@@ -12,16 +12,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install lftp
+        run: sudo apt-get install lftp
+
       - name: Remove excluded files
         run: |
           rm -rf .git .github node_modules cypress tests docs .env.example README.md package.json package-lock.json vitest.config.js || true
 
-      - name: SFTP Deploy
-        uses: wangyucode/sftp-upload-action@v2.0.2
-        with:
-          host: ${{ secrets.SFTP_HOST }}
-          username: ${{ secrets.SFTP_USERNAME }}
-          password: ${{ secrets.SFTP_PASSWORD }}
-          port: ${{ secrets.SFTP_PORT }}
-          localDir: '.'
-          remoteDir: ${{ secrets.SFTP_TARGET_DIR }}
+      - name: Deploy via lftp
+        run: |
+          lftp -c "open -u ${{ secrets.SFTP_USERNAME }},${{ secrets.SFTP_PASSWORD }} sftp://${{ secrets.SFTP_HOST }}; mirror -R -v --parallel=2 --exclude-glob .git* --exclude-glob .github* --exclude-glob node_modules* . ${{ secrets.SFTP_TARGET_DIR }}"
