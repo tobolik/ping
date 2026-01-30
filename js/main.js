@@ -12,7 +12,26 @@ import { voiceInput } from './voice-input.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     initUI();
-    voiceInput.init(updateScore, undoLastPoint);
+    
+    // Inicializace voice input s potřebnými akcemi
+    voiceInput.init({
+        updateScore,
+        undoLastPoint,
+        setFirstServer: (playerId) => {
+             // Wrapper pro setFirstServer, který simuluje kliknutí nebo volá logiku
+             // Protože allActions['set-first-server'] očekává target s datasetem,
+             // musíme si pomoci nebo zavolat logiku přímo.
+             // Pro jednoduchost zde zavoláme existující akci s fake targetem.
+             allActions['set-first-server']({ dataset: { playerId: playerId } });
+        },
+        swapSides: () => {
+             const t = getTournament();
+             const m = getMatch(t, state.activeMatchId);
+             if (m) allActions['swap-sides']({ dataset: { id: m.id } });
+        },
+        suspendMatch: () => allActions['suspend-match']()
+    });
+
     const app = document.getElementById('app');
     const modalsContainer = getModalsContainer();
     const screens = getScreens();

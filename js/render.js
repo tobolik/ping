@@ -282,6 +282,7 @@ export function renderStartMatchModal(match) {
                 <div class="modal-content space-y-6 text-center">
                     <h1 class="text-2xl font-bold">${sides.left.label} vs ${sides.right.label}</h1>
                     <p class="text-gray-500">Hraje se na ${t.pointsToWin} bodů</p>
+                    ${state.settings.voiceInputEnabled ? '<p class="text-sm text-green-600 animate-pulse"><i class="fa-solid fa-microphone"></i> Řekněte jméno hráče pro výběr servisu</p>' : ''}
                     <div>
                         <h2 class="text-lg font-semibold mb-3">Kdo má první podání?</h2>
                         <div class="grid grid-cols-2 gap-4">
@@ -311,6 +312,7 @@ export function renderStartMatchModal(match) {
                 <div class="modal-content space-y-6 text-center">
                     <h1 class="text-2xl font-bold">${p1.name} vs ${p2.name}</h1>
                     <p class="text-gray-500">Hraje se na ${t.pointsToWin} bodů</p>
+                    ${state.settings.voiceInputEnabled ? '<p class="text-sm text-green-600 animate-pulse"><i class="fa-solid fa-microphone"></i> Řekněte jméno hráče pro výběr servisu</p>' : ''}
                     <div>
                         <h2 class="text-lg font-semibold mb-3">Kdo má první podání?</h2>
                         <div class="grid grid-cols-2 gap-4">

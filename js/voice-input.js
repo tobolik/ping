@@ -8,10 +8,28 @@ class VoiceInputManager {
         this.recognition = null;
         this.isListening = false;
         this.keywords = new Map(); // word -> playerId
-        this.updateScoreFn = null;
-        this.undoLastPointFn = null;
+        this.actions = {}; // actionName -> callback
+        this.context = 'game'; // 'game' | 'setup'
         this.lang = 'cs-CZ';
         this.restartTimer = null;
+        
+        // Mapování českých příkazů na klíče akcí
+        this.commandMap = {
+            'game': {
+                'zpět': 'undo',
+                'opravit': 'undo',
+                'vrátit': 'undo',
+                'vyměnit strany': 'swapSides',
+                'změna stran': 'swapSides',
+                'otočit strany': 'swapSides',
+                'pauza': 'suspend',
+                'přerušit': 'suspend',
+                'konec': 'suspend'
+            },
+            'setup': {
+                // V setupu (výběr podání) mapujeme jména přímo na akci setFirstServer
+            }
+        };
 
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -28,9 +46,15 @@ class VoiceInputManager {
         }
     }
 
-    init(updateScoreFn, undoLastPointFn) {
-        this.updateScoreFn = updateScoreFn;
-        this.undoLastPointFn = undoLastPointFn;
+    init(actions) {
+        // actions: { updateScore, undoLastPoint, setFirstServer, swapSides, suspendMatch }
+        this.actions = actions;
+    }
+
+    setContext(context) {
+        this.context = context;
+        console.log('VoiceInput context set to:', context);
+        this.updateKeywords();
     }
 
     isActive() {
@@ -98,49 +122,91 @@ class VoiceInputManager {
         if (!result.isFinal) return; // Zpracováváme jen finální výsledky
 
         const text = result[0].transcript.trim().toLowerCase();
-        console.log('VoiceInput received:', text);
+        console.log('VoiceInput received:', text, 'Context:', this.context);
 
-        if (text.includes('zpět') || text.includes('opravit')) {
-             if (this.undoLastPointFn) {
-                 this.undoLastPointFn();
-                 showToast('Akce vrácena (hlasem)', 'info');
-                 speak('Opravuji');
-             }
-             return;
+        // 1. Kontrola příkazů pro daný kontext
+        const contextCommands = this.commandMap[this.context] || {};
+        for (const [phrase, actionKey] of Object.entries(contextCommands)) {
+            if (text.includes(phrase)) {
+                this.executeAction(actionKey);
+                return;
+            }
         }
 
-        // Kontrola "bod [hráč]" nebo jen "[hráč]"
-        let lookupTerm = text;
-        if (text.startsWith('bod ')) {
-            lookupTerm = text.substring(4).trim();
-        }
+        // 2. Logika pro 'game' kontext (bodování)
+        if (this.context === 'game') {
+             // Kontrola "bod [hráč]" nebo jen "[hráč]"
+            let lookupTerm = text;
+            if (text.startsWith('bod ')) {
+                lookupTerm = text.substring(4).trim();
+            }
 
+            const playerId = this.findPlayerId(lookupTerm);
+            if (playerId) {
+                if (this.actions.updateScore) {
+                    this.actions.updateScore(playerId, 1);
+                    const player = getGlobalPlayer(playerId);
+                    const name = player.nickname || player.name;
+                    showToast(`Bod pro: ${name} (hlasem)`, 'success');
+                }
+            } else {
+                 console.log('VoiceInput: Žádná shoda pro', text);
+            }
+        } 
+        // 3. Logika pro 'setup' kontext (výběr podání)
+        else if (this.context === 'setup') {
+            const playerId = this.findPlayerId(text);
+            if (playerId) {
+                if (this.actions.setFirstServer) {
+                    this.actions.setFirstServer(playerId);
+                    const player = getGlobalPlayer(playerId);
+                    showToast(`První podání: ${player.name} (hlasem)`, 'success');
+                }
+            }
+        }
+    }
+
+    executeAction(actionKey) {
+        console.log('VoiceInput executing action:', actionKey);
+        switch (actionKey) {
+            case 'undo':
+                if (this.actions.undoLastPoint) {
+                    this.actions.undoLastPoint();
+                    showToast('Akce vrácena (hlasem)', 'info');
+                    speak('Opravuji');
+                }
+                break;
+            case 'swapSides':
+                if (this.actions.swapSides) {
+                    this.actions.swapSides();
+                    showToast('Výměna stran (hlasem)', 'info');
+                    speak('Měním strany');
+                }
+                break;
+            case 'suspend':
+                if (this.actions.suspendMatch) {
+                    this.actions.suspendMatch();
+                    showToast('Zápas přerušen (hlasem)', 'info');
+                }
+                break;
+        }
+    }
+
+    findPlayerId(term) {
         // 1. Zkusíme přesnou shodu
-        let playerId = this.keywords.get(lookupTerm);
+        let playerId = this.keywords.get(term);
         
         // 2. Pokud není přesná shoda, zkusíme najít, zda text obsahuje klíčové slovo
-        // Pozor: může být nebezpečné pro krátká slova, ale máme limit > 2 znaky
         if (!playerId) {
             for (const [key, id] of this.keywords.entries()) {
-                 // Hledáme celé slovo v textu (aby 'jan' nenašlo 'jana')
                  const regex = new RegExp(`\\b${key}\\b`);
-                 if (regex.test(lookupTerm)) {
+                 if (regex.test(term)) {
                      playerId = id;
-                     break; // Bereme první shodu
+                     break; 
                  }
             }
         }
-
-        if (playerId) {
-            if (this.updateScoreFn) {
-                this.updateScoreFn(playerId, 1);
-                const player = getGlobalPlayer(playerId);
-                const name = player.nickname || player.name;
-                showToast(`Bod pro: ${name} (hlasem)`, 'success');
-            }
-        } else {
-             console.log('VoiceInput: Žádná shoda pro', text);
-        }
+        return playerId;
     }
 
     handleError(event) {

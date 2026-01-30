@@ -490,9 +490,16 @@ export const allActions = {
         m.score2 = m.score2 || 0;
         if (!m.firstServer) {
             renderStartMatchModal(m);
+            if (state.settings.voiceInputEnabled) {
+                voiceInput.setContext('setup');
+                voiceInput.start();
+            }
         } else {
             renderGameBoard();
-            if (state.settings.voiceInputEnabled) voiceInput.start();
+            if (state.settings.voiceInputEnabled) {
+                voiceInput.setContext('game');
+                voiceInput.start();
+            }
         }
     },
     'set-first-server': async (target) => {
@@ -559,7 +566,10 @@ export const allActions = {
         }
         closeModal();
         renderGameBoard();
-        if (state.settings.voiceInputEnabled) voiceInput.start();
+        if (state.settings.voiceInputEnabled) {
+            voiceInput.setContext('game');
+            voiceInput.start();
+        }
     },
     'add-point': (target) => {
         const playerId = target.dataset.playerId ? parseInt(target.dataset.playerId) : null;
@@ -629,6 +639,7 @@ export const allActions = {
         state.settings.voiceInputEnabled = !state.settings.voiceInputEnabled;
         apiCall('saveSettings', { key: 'voiceInputEnabled', value: state.settings.voiceInputEnabled });
         if (state.settings.voiceInputEnabled) {
+            voiceInput.setContext('game');
             voiceInput.start();
         } else {
             voiceInput.stop();
