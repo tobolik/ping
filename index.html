@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>🏓 Ping pong turnaje</title>
     <script>
         // Potlačení varování a chyb o produkčním použití Tailwind CSS CDN a CSP - MUSÍ být před načtením Tailwind CDN
@@ -51,18 +54,18 @@
     <!-- Import modulů a zpřístupnění do window, aby stávající inline kód postupně fungoval přes moduly -->
     <script type="module">
         // Zpřístupnění modulů do window pro přechodné období refaktoringu
-        import * as Constants from './js/constants.js';
-        import { state } from './js/state.js';
-        import * as Api from './js/api.js';
-        import * as Utils from './js/utils.js';
-        import * as Audio from './js/audio.js';
-        import * as UI from './js/ui.js';
-        import * as Render from './js/render.js';
-        import * as Stats from './js/stats.js';
-        import * as GameLogic from './js/game-logic.js';
-        import * as Actions from './js/actions.js';
-        import { setupAutocomplete } from './js/autocomplete.js';
-        import { generateUniqueTournamentName } from './js/utils/tournament-utils.js';
+        import * as Constants from './js/constants.js?v=1.1.0';
+        import { state } from './js/state.js?v=1.1.0';
+        import * as Api from './js/api.js?v=1.1.0';
+        import * as Utils from './js/utils.js?v=1.1.0';
+        import * as Audio from './js/audio.js?v=1.1.0';
+        import * as UI from './js/ui.js?v=1.1.0';
+        import * as Render from './js/render.js?v=1.1.0';
+        import * as Stats from './js/stats.js?v=1.1.0';
+        import * as GameLogic from './js/game-logic.js?v=1.1.0';
+        import * as Actions from './js/actions.js?v=1.1.0';
+        import { setupAutocomplete } from './js/autocomplete.js?v=1.1.0';
+        import { generateUniqueTournamentName } from './js/utils/tournament-utils.js?v=1.1.0';
 
         Object.assign(window, {
             // konstanty a state
@@ -177,6 +180,6 @@
         </footer>
     </div>
 
-<script type="module" src="js/main.js"></script>
+<script type="module" src="js/main.js?v=1.1.0"></script>
 </body>
 </html>
