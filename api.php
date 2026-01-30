@@ -649,24 +649,29 @@ function handleSavePlayer($conn, $payload) {
     $data = $payload['data'];
     
     if ($id) {
-        $stmt = $conn->prepare("SELECT name, photo_url, strengths, weaknesses FROM players WHERE entity_id = ? AND valid_to IS NULL");
+        $stmt = $conn->prepare("SELECT name, nickname, photo_url, strengths, weaknesses FROM players WHERE entity_id = ? AND valid_to IS NULL");
         $stmt->bind_param("i", $id);
         $stmt->execute();
         $dbPlayer = $stmt->get_result()->fetch_assoc();
         
-        if ($dbPlayer && ($dbPlayer['name'] != $data['name'] || $dbPlayer['photo_url'] != $data['photoUrl'] || $dbPlayer['strengths'] != $data['strengths'] || $dbPlayer['weaknesses'] != $data['weaknesses'])) {
+        // Check if nickname exists in db result to avoid warning if column not yet added
+        $dbNickname = $dbPlayer['nickname'] ?? null;
+        $newNickname = $data['nickname'] ?? null;
+
+        if ($dbPlayer && ($dbPlayer['name'] != $data['name'] || $dbNickname != $newNickname || $dbPlayer['photo_url'] != $data['photoUrl'] || $dbPlayer['strengths'] != $data['strengths'] || $dbPlayer['weaknesses'] != $data['weaknesses'])) {
             $stmtUpdate = $conn->prepare("UPDATE players SET valid_to = NOW() WHERE entity_id = ? AND valid_to IS NULL");
             $stmtUpdate->bind_param("i", $id);
             $stmtUpdate->execute();
 
-            $stmtInsert = $conn->prepare("INSERT INTO players (entity_id, name, photo_url, strengths, weaknesses) VALUES (?, ?, ?, ?, ?)");
-            $stmtInsert->bind_param("issss", $id, $data['name'], $data['photoUrl'], $data['strengths'], $data['weaknesses']);
+            $stmtInsert = $conn->prepare("INSERT INTO players (entity_id, name, nickname, photo_url, strengths, weaknesses) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmtInsert->bind_param("isssss", $id, $data['name'], $newNickname, $data['photoUrl'], $data['strengths'], $data['weaknesses']);
             $stmtInsert->execute();
         }
 } else {
         $nextEntityId = getNextEntityId($conn, 'players');
-        $stmtInsert = $conn->prepare("INSERT INTO players (entity_id, name, photo_url, strengths, weaknesses) VALUES (?, ?, ?, ?, ?)");
-        $stmtInsert->bind_param("issss", $nextEntityId, $data['name'], $data['photoUrl'], $data['strengths'], $data['weaknesses']);
+        $newNickname = $data['nickname'] ?? null;
+        $stmtInsert = $conn->prepare("INSERT INTO players (entity_id, name, nickname, photo_url, strengths, weaknesses) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmtInsert->bind_param("isssss", $nextEntityId, $data['name'], $newNickname, $data['photoUrl'], $data['strengths'], $data['weaknesses']);
         $stmtInsert->execute();
     }
 }
@@ -712,7 +717,7 @@ function handleGetData($conn) {
         $data['settings'][$row['setting_key']] = ($value === 'true') ? true : (($value === 'false') ? false : $value);
     }
 
-    $playersResult = $conn->query("SELECT entity_id as id, name, photo_url, strengths, weaknesses FROM players WHERE valid_to IS NULL ORDER BY entity_id");
+    $playersResult = $conn->query("SELECT entity_id as id, name, nickname, photo_url, strengths, weaknesses FROM players WHERE valid_to IS NULL ORDER BY entity_id");
     $data['playerDatabase'] = $playersResult->fetch_all(MYSQLI_ASSOC);
 
     $tournamentsResult = $conn->query("SELECT entity_id as id, name, points_to_win, tournament_type, is_locked, valid_from as createdAt FROM tournaments WHERE valid_to IS NULL ORDER BY entity_id");

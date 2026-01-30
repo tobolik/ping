@@ -163,7 +163,50 @@ export const updateScore = async (playerId, delta, sideOverride = null) => {
 
 export const allActions = {
     'show-player-db': renderPlayerDbScreen,
-    'show-edit-player-modal':(target)=>{const playerId=target.dataset.id==='new'?null:parseInt(target.dataset.id);const p=playerId?getGlobalPlayer(playerId):{name:'',photoUrl:'',strengths:'',weaknesses:''};openModal(`<div id="edit-player-modal" class="modal-backdrop"><div class="modal-content space-y-4"><div class="flex justify-between items-center"><h2 class="text-xl font-bold">${playerId?'Upravit hráče':'Nový hráč'}</h2><button data-action="close-modal" class="text-gray-400 text-2xl hover:text-gray-700">&times;</button></div><div class="text-center"><img src="${p.photoUrl||`data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2280%22%20height%3D%2280%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20fill%3D%22%23e5e7eb%22%20rx%3D%2240%22%2F%3E${p.name?`%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22central%22%20text-anchor%3D%22middle%22%20font-family%3D%22Inter%22%20font-size%3D%2232%22%20fill%3D%22%239ca3af%22%3E${p.name.charAt(0).toUpperCase()}%3C%2Ftext%3E`:''}%3C%2Fsvg%3E`}" class="w-20 h-20 rounded-full object-cover bg-gray-200 inline-block"></div><div><label for="player-name" class="text-sm font-medium">Jméno</label><input id="player-name" value="${p.name}" class="w-full mt-1 p-2 border rounded-md"></div><div><label for="player-photo" class="text-sm font-medium">URL fotografie</label><input id="player-photo" value="${p.photoUrl||''}" placeholder="https://..." class="w-full mt-1 p-2 border rounded-md"></div><div><label for="player-strengths" class="text-sm font-medium">Silné stránky</label><textarea id="player-strengths" class="w-full mt-1 p-2 border rounded-md h-20">${p.strengths||''}</textarea></div><div><label for="player-weaknesses" class="text-sm font-medium">Slabé stránky</label><textarea id="player-weaknesses" class="w-full mt-1 p-2 border rounded-md h-20">${p.weaknesses||''}</textarea></div><div class="flex gap-2"><button data-action="close-modal" class="btn btn-secondary w-full">Zrušit</button><button data-action="save-player" data-id="${playerId||''}" class="btn btn-primary w-full">Uložit</button></div></div></div>`);document.getElementById('edit-player-modal').addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); document.querySelector('[data-action="save-player"]').click(); } });document.getElementById('player-name').focus();},
+    'show-edit-player-modal':(target)=>{
+        const playerId=target.dataset.id==='new'?null:parseInt(target.dataset.id);
+        const p=playerId?getGlobalPlayer(playerId):{name:'',nickname:'',photoUrl:'',strengths:'',weaknesses:''};
+        openModal(`
+            <div id="edit-player-modal" class="modal-backdrop">
+                <div class="modal-content space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold">${playerId?'Upravit hráče':'Nový hráč'}</h2>
+                        <button data-action="close-modal" class="text-gray-400 text-2xl hover:text-gray-700">&times;</button>
+                    </div>
+                    <div class="text-center">
+                        <img src="${p.photoUrl||`data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2280%22%20height%3D%2280%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20fill%3D%22%23e5e7eb%22%20rx%3D%2240%22%2F%3E${p.name?`%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22central%22%20text-anchor%3D%22middle%22%20font-family%3D%22Inter%22%20font-size%3D%2232%22%20fill%3D%22%239ca3af%22%3E${p.name.charAt(0).toUpperCase()}%3C%2Ftext%3E`:''}%3C%2Fsvg%3E`}" class="w-20 h-20 rounded-full object-cover bg-gray-200 inline-block">
+                    </div>
+                    <div>
+                        <label for="player-name" class="text-sm font-medium">Jméno</label>
+                        <input id="player-name" value="${p.name}" class="w-full mt-1 p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label for="player-nickname" class="text-sm font-medium">Přezdívka (pro hlasové ovládání)</label>
+                        <input id="player-nickname" value="${p.nickname||''}" placeholder="Např. Marťas" class="w-full mt-1 p-2 border rounded-md">
+                        <p class="text-xs text-gray-500 mt-1">Použije se pro hlasové povely. Pokud je prázdná, použije se jméno.</p>
+                    </div>
+                    <div>
+                        <label for="player-photo" class="text-sm font-medium">URL fotografie</label>
+                        <input id="player-photo" value="${p.photoUrl||''}" placeholder="https://..." class="w-full mt-1 p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label for="player-strengths" class="text-sm font-medium">Silné stránky</label>
+                        <textarea id="player-strengths" class="w-full mt-1 p-2 border rounded-md h-20">${p.strengths||''}</textarea>
+                    </div>
+                    <div>
+                        <label for="player-weaknesses" class="text-sm font-medium">Slabé stránky</label>
+                        <textarea id="player-weaknesses" class="w-full mt-1 p-2 border rounded-md h-20">${p.weaknesses||''}</textarea>
+                    </div>
+                    <div class="flex gap-2">
+                        <button data-action="close-modal" class="btn btn-secondary w-full">Zrušit</button>
+                        <button data-action="save-player" data-id="${playerId||''}" class="btn btn-primary w-full">Uložit</button>
+                    </div>
+                </div>
+            </div>
+        `);
+        document.getElementById('edit-player-modal').addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); document.querySelector('[data-action="save-player"]').click(); } });
+        document.getElementById('player-name').focus();
+    },
     'save-player': async (target) => {
         const playerId = target.dataset.id ? parseInt(target.dataset.id) : null;
         const name = document.getElementById('player-name').value.trim();
@@ -172,6 +215,7 @@ export const allActions = {
             id: playerId,
             data: {
                 name,
+                nickname: document.getElementById('player-nickname').value.trim(),
                 photoUrl: document.getElementById('player-photo').value.trim(),
                 strengths: document.getElementById('player-strengths').value.trim(),
                 weaknesses: document.getElementById('player-weaknesses').value.trim(),
