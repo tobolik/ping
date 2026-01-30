@@ -300,31 +300,51 @@ function handleSwapSides($conn, $payload) {
         return;
     }
 
-    // 3. Vložíme nový záznam s prohozenou hodnotou – vždy placeholder ?, double_rotation_state bindujeme (i NULL)
+    // 3. Vložíme nový záznam s prohozenou hodnotou – double_rotation_state: při NULL literál NULL v SQL, jinak bind "s"
     $newSidesSwapped = !$dbMatch['sides_swapped'];
     $rotVal = $dbMatch['double_rotation_state'] ?? null;
-    $sqlInsert = "INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, team1_id, team2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped, double_rotation_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $rotIsNull = ($rotVal === null);
+    $doubleRotationExpr = $rotIsNull ? 'NULL' : '?';
+    $sqlInsert = "INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, team1_id, team2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped, double_rotation_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, $doubleRotationExpr)";
     $stmtInsert = $conn->prepare($sqlInsert);
     if (!$stmtInsert) {
         error_log("handleSwapSides: Failed to prepare insert: " . $conn->error);
         return;
     }
-    $stmtInsert->bind_param("iiiiiiiiiiiiis",
-        $matchId,
-        $dbMatch['tournament_id'],
-        $dbMatch['player1_id'],
-        $dbMatch['player2_id'],
-        $dbMatch['team1_id'],
-        $dbMatch['team2_id'],
-        $dbMatch['score1'],
-        $dbMatch['score2'],
-        $dbMatch['completed'],
-        $dbMatch['first_server'],
-        $dbMatch['serving_player'],
-        $dbMatch['match_order'],
-        $newSidesSwapped,
-        $rotVal
-    );
+    if ($rotIsNull) {
+        $stmtInsert->bind_param("iiiiiiiiiiiii",
+            $matchId,
+            $dbMatch['tournament_id'],
+            $dbMatch['player1_id'],
+            $dbMatch['player2_id'],
+            $dbMatch['team1_id'],
+            $dbMatch['team2_id'],
+            $dbMatch['score1'],
+            $dbMatch['score2'],
+            $dbMatch['completed'],
+            $dbMatch['first_server'],
+            $dbMatch['serving_player'],
+            $dbMatch['match_order'],
+            $newSidesSwapped
+        );
+    } else {
+        $stmtInsert->bind_param("iiiiiiiiiiiiis",
+            $matchId,
+            $dbMatch['tournament_id'],
+            $dbMatch['player1_id'],
+            $dbMatch['player2_id'],
+            $dbMatch['team1_id'],
+            $dbMatch['team2_id'],
+            $dbMatch['score1'],
+            $dbMatch['score2'],
+            $dbMatch['completed'],
+            $dbMatch['first_server'],
+            $dbMatch['serving_player'],
+            $dbMatch['match_order'],
+            $newSidesSwapped,
+            $rotVal
+        );
+    }
     if (!$stmtInsert->execute()) {
         error_log("handleSwapSides: Failed to insert new match: " . $stmtInsert->error);
         return;
