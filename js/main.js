@@ -3,14 +3,16 @@
 import { initUI, getModalsContainer, getScreens, closeModal, showConfirmModal, showAlertModal } from './ui.js';
 import { loadState, apiCall } from './api.js';
 import { renderMainScreen } from './render.js';
-import { allActions, updateScore } from './actions.js';
+import { allActions, updateScore, undoLastPoint } from './actions.js';
 import { state } from './state.js';
 import { getTournament, getMatch } from './utils.js';
 import { checkWinCondition } from './game-logic.js';
 import { initializeAudio, speak } from './audio.js';
+import { voiceInput } from './voice-input.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     initUI();
+    voiceInput.init(updateScore, undoLastPoint);
     const app = document.getElementById('app');
     const modalsContainer = getModalsContainer();
     const screens = getScreens();

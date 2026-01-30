@@ -6,6 +6,7 @@ export let state = {
     settings: {
         soundsEnabled: true,
         voiceAssistEnabled: false,
+        voiceInputEnabled: false,
         showLockedTournaments: false,
         motivationalPhrasesEnabled: true
     },
@@ -20,6 +21,7 @@ export function updateStateWithApiData(data) {
     state.settings = {
         soundsEnabled: true,
         voiceAssistEnabled: false,
+        voiceInputEnabled: false,
         voiceVolume: 1,
         showLockedTournaments: false,
         motivationalPhrasesEnabled: true,

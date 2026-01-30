@@ -1,6 +1,7 @@
 // Akce aplikace (allActions) – přesunuto z index.html
 
 import { state } from './state.js';
+import { voiceInput } from './voice-input.js';
 import { TOURNAMENT_TYPES, playerColors, encouragingPhrases, winningPhrases } from './constants.js';
 import { apiCall, loadState } from './api.js';
 import { openModal, closeModal, showAlertModal, showConfirmModal, showToast, renderGameScreen } from './ui.js';
@@ -471,7 +472,11 @@ export const allActions = {
         }
     },
     'back-to-main':renderMainScreen,
-    'back-to-tournament':()=>{closeModal();renderTournamentScreen();},
+    'back-to-tournament':()=>{
+        voiceInput.stop();
+        closeModal();
+        renderTournamentScreen();
+    },
     'show-stats':()=>renderStatsScreen(),
     'export-csv':()=>exportToCSV(),
     'export-pdf':()=>exportToPDF(),
@@ -487,6 +492,7 @@ export const allActions = {
             renderStartMatchModal(m);
         } else {
             renderGameBoard();
+            if (state.settings.voiceInputEnabled) voiceInput.start();
         }
     },
     'set-first-server': async (target) => {
@@ -553,6 +559,7 @@ export const allActions = {
         }
         closeModal();
         renderGameBoard();
+        if (state.settings.voiceInputEnabled) voiceInput.start();
     },
     'add-point': (target) => {
         const playerId = target.dataset.playerId ? parseInt(target.dataset.playerId) : null;
@@ -565,8 +572,12 @@ export const allActions = {
         updateScore(null, -1, side);
     },
     'undo-last-point': undoLastPoint,
-    'suspend-match':()=>{renderTournamentScreen();},
+    'suspend-match':()=>{
+        voiceInput.stop();
+        renderTournamentScreen();
+    },
     'save-match-result': async () => {
+        voiceInput.stop();
         const t = getTournament();
         const m = getMatch(t, state.activeMatchId);
         m.completed = true;
@@ -597,7 +608,11 @@ export const allActions = {
         renderTournamentScreen();
     },
     'close-and-refresh':()=>{closeModal();renderTournamentScreen();},
-    'close-and-home':()=>{closeModal();renderMainScreen();},
+    'close-and-home':()=>{
+        voiceInput.stop();
+        closeModal();
+        renderMainScreen();
+    },
     'export-data':async ()=>{if(state.tournaments.length===0&&state.playerDatabase.length===0){await showAlertModal("Není co exportovat.", 'Upozornění');return;}const dataStr=JSON.stringify(state,null,2);const dataBlob=new Blob([dataStr],{type:'application/json'});const url=URL.createObjectURL(dataBlob);const a=document.createElement('a');a.href=url;a.download='ping-pong-turnaje.json';a.click();URL.revokeObjectURL(url);},
     'close-modal': closeModal,
     'toggle-settings-menu': () => {
@@ -609,6 +624,16 @@ export const allActions = {
             document.getElementById('show-locked-toggle').checked = state.settings.showLockedTournaments || false;
             document.getElementById('motivational-phrases-toggle').checked = !!state.settings.motivationalPhrasesEnabled;
         }
+    },
+    'toggle-voice-input-ingame': () => {
+        state.settings.voiceInputEnabled = !state.settings.voiceInputEnabled;
+        apiCall('saveSettings', { key: 'voiceInputEnabled', value: state.settings.voiceInputEnabled });
+        if (state.settings.voiceInputEnabled) {
+            voiceInput.start();
+        } else {
+            voiceInput.stop();
+        }
+        renderGameBoard();
     },
     'toggle-sound-ingame': () => {
         state.settings.soundsEnabled = !state.settings.soundsEnabled;
