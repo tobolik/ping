@@ -125,15 +125,14 @@ export const updateScore = async (playerId, delta, sideOverride = null) => {
             const servingLabel = m.servingPlayer ? (getGlobalPlayer(m.servingPlayer)?.name || '') : '';  // Zobrazujeme jméno konkrétního hráče, ne tým
             const servingPlayerScore = servingSide === 1 ? m.score1 : m.score2;
             const otherPlayerScore = servingSide === 1 ? m.score2 : m.score1;
+            const winnerSide = checkWinCondition(m, t.pointsToWin);
 
-            if (m.completed) { // This state je nastaveno po checkWinCondition
-                const winnerSide = checkWinCondition(m, t.pointsToWin);
-                if (winnerSide) {
-                    const winnerLabel = formatPlayersLabel(winnerSide === 1 ? side1Players : side2Players);
-                    const winnerScore = Math.max(m.score1, m.score2);
-                    const loserScore = Math.min(m.score1, m.score2);
-                    speak(`Konec zápasu. Vítěz ${winnerLabel}. ${winnerScore} : ${loserScore}`);
-                }
+            if (winnerSide) { 
+                const winnerLabel = formatPlayersLabel(winnerSide === 1 ? side1Players : side2Players);
+                const winnerScore = Math.max(m.score1, m.score2);
+                const loserScore = Math.min(m.score1, m.score2);
+                const randomPhrase = winningPhrases[Math.floor(Math.random() * winningPhrases.length)];
+                speak(`Konec zápasu. Vítěz ${winnerLabel}. ${winnerScore} : ${loserScore}, ${randomPhrase}`);
             } else if (servingLabel) {
                 let speechText = `${servingLabel}, ${servingPlayerScore} : ${otherPlayerScore}`;
                 // Pokud jsou motivační hlášky zapnuté, přidáme je podle situace
