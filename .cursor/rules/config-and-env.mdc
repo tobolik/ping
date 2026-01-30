@@ -1,0 +1,22 @@
+---
+description: Konfigurace DB z .env – žádné hesla v gitu; neobnovovat výchozí přihlašovací údaje v config.php
+alwaysApply: true
+---
+
+# Konfigurace databáze a .env
+
+## Záměr projektu
+
+- **config/config.php**: Výchozí hodnoty pro `DB_NAME`, `DB_USER`, `DB_PASS` jsou **záměrně `null`**.
+- Přihlašovací údaje k databázi **nesmí být v repozitáři** (ani jako výchozí hodnoty v kódu).
+- Aplikace vyžaduje soubor `.env` (nebo `.env.localhost` / `.env.production`). Šablona je v `.env.example`.
+
+## Co NEDĚLAT při review ani při úpravách
+
+- **Nepředpisovat** ani **nepřidávat** výchozí hodnoty typu `'sensiocz02'`, `'root'`, `'vertrigo'` do `config/config.php`.
+- **Neoznačovat** použití `null` pro DB credentials v config.php jako chybu – je to záměrné rozhodnutí.
+
+## Co dělat při chybějícím .env
+
+- api.php při chybějícím .env vrací srozumitelnou chybu (HTTP 503): „Database not configured. Copy .env.example to .env…“
+- Řešením není úprava config.php výchozích hodnot, ale vytvoření/vyplnění `.env` podle `.env.example`.

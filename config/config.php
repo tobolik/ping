@@ -61,6 +61,9 @@ function getEnvValue($key, $default = null) {
     return $default;
 }
 
+// DB přihlašovací údaje: záměrně bez výchozích hodnot (null). Nesmí být v gitu.
+// Aplikace vyžaduje .env soubor – zkopírujte .env.example jako .env nebo .env.localhost
+// a nastavte DB_NAME, DB_USER, DB_PASS. Při chybějícím .env api.php vrátí srozumitelnou chybu.
 $config = [
     'db' => [
         'host' => getEnvValue('MYSQLHOST', getEnvValue('DB_HOST', '127.0.0.1')),

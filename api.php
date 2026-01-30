@@ -20,8 +20,16 @@ try {
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 
-// Zkusíme připojení pomocí MySQLi (podle testu funguje)
-$conn = @new mysqli($config['db']['host'], $config['db']['user'], $config['db']['pass'], $config['db']['name']);
+// Při chybějícím .env vrátíme srozumitelnou chybu (bez volání mysqli s null)
+$db = $config['db'];
+if (empty($db['name']) || $db['user'] === null || $db['user'] === '') {
+    http_response_code(503);
+    error_log('DB not configured: missing .env (DB_NAME, DB_USER, DB_PASS). Copy .env.example to .env or .env.localhost.');
+    echo json_encode(['error' => 'Database not configured. Copy .env.example to .env (or .env.localhost) and set DB_NAME, DB_USER, DB_PASS.']);
+    exit();
+}
+
+$conn = @new mysqli($db['host'], $db['user'], $db['pass'] ?? '', $db['name']);
 
 if ($conn->connect_error) {
     http_response_code(500);
@@ -68,7 +76,7 @@ if ($method === 'POST') {
             case 'swapSides':
                 handleSwapSides($conn, $payload);
                 $conn->commit();
-                handleGetData($conn);
+                echo json_encode(['success' => true]);
                 exit();
             case 'toggleTournamentLock':
                 handleToggleTournamentLock($conn, $payload);
@@ -292,25 +300,51 @@ function handleSwapSides($conn, $payload) {
         return;
     }
 
-    // 3. Vložíme nový záznam s prohozenou hodnotou
+    // 3. Vložíme nový záznam s prohozenou hodnotou – double_rotation_state: při NULL literál NULL v SQL, jinak bind "s"
     $newSidesSwapped = !$dbMatch['sides_swapped'];
-    $stmtInsert = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, team1_id, team2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped, double_rotation_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmtInsert->bind_param("iiiiiiiiiiiiis", 
-        $matchId, 
-        $dbMatch['tournament_id'], 
-        $dbMatch['player1_id'], 
-        $dbMatch['player2_id'], 
-        $dbMatch['team1_id'],
-        $dbMatch['team2_id'],
-        $dbMatch['score1'], 
-        $dbMatch['score2'], 
-        $dbMatch['completed'], 
-        $dbMatch['first_server'], 
-        $dbMatch['serving_player'], 
-        $dbMatch['match_order'], 
-        $newSidesSwapped,
-        $dbMatch['double_rotation_state']
-    );
+    $rotVal = $dbMatch['double_rotation_state'] ?? null;
+    $rotIsNull = ($rotVal === null);
+    $doubleRotationExpr = $rotIsNull ? 'NULL' : '?';
+    $sqlInsert = "INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, team1_id, team2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped, double_rotation_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, $doubleRotationExpr)";
+    $stmtInsert = $conn->prepare($sqlInsert);
+    if (!$stmtInsert) {
+        error_log("handleSwapSides: Failed to prepare insert: " . $conn->error);
+        return;
+    }
+    if ($rotIsNull) {
+        $stmtInsert->bind_param("iiiiiiiiiiiii",
+            $matchId,
+            $dbMatch['tournament_id'],
+            $dbMatch['player1_id'],
+            $dbMatch['player2_id'],
+            $dbMatch['team1_id'],
+            $dbMatch['team2_id'],
+            $dbMatch['score1'],
+            $dbMatch['score2'],
+            $dbMatch['completed'],
+            $dbMatch['first_server'],
+            $dbMatch['serving_player'],
+            $dbMatch['match_order'],
+            $newSidesSwapped
+        );
+    } else {
+        $stmtInsert->bind_param("iiiiiiiiiiiiis",
+            $matchId,
+            $dbMatch['tournament_id'],
+            $dbMatch['player1_id'],
+            $dbMatch['player2_id'],
+            $dbMatch['team1_id'],
+            $dbMatch['team2_id'],
+            $dbMatch['score1'],
+            $dbMatch['score2'],
+            $dbMatch['completed'],
+            $dbMatch['first_server'],
+            $dbMatch['serving_player'],
+            $dbMatch['match_order'],
+            $newSidesSwapped,
+            $rotVal
+        );
+    }
     if (!$stmtInsert->execute()) {
         error_log("handleSwapSides: Failed to insert new match: " . $stmtInsert->error);
         return;
@@ -485,17 +519,7 @@ function handleUpdateMatch($conn, $payload) {
             error_log("handleUpdateMatch: Zápas s entity_id $id nebyl nalezen ani v historii");
             return;
         }
-        // Použijeme hodnoty z dat, pokud jsou k dispozici, jinak z posledního záznamu
-        $dbMatch['score1'] = isset($data['score1']) ? $data['score1'] : $dbMatch['score1'];
-        $dbMatch['score2'] = isset($data['score2']) ? $data['score2'] : $dbMatch['score2'];
-        $dbMatch['completed'] = isset($data['completed']) ? $data['completed'] : $dbMatch['completed'];
-        $dbMatch['first_server'] = isset($data['firstServer']) ? $data['firstServer'] : $dbMatch['first_server'];
-        $dbMatch['serving_player'] = isset($data['servingPlayer']) ? $data['servingPlayer'] : $dbMatch['serving_player'];
-        $dbMatch['sides_swapped'] = isset($data['sidesSwapped']) ? ($data['sidesSwapped'] ? 1 : 0) : $dbMatch['sides_swapped'];
-        $dbMatch['team1_id'] = isset($data['team1Id']) ? $data['team1Id'] : $dbMatch['team1_id'];
-        $dbMatch['team2_id'] = isset($data['team2Id']) ? $data['team2Id'] : $dbMatch['team2_id'];
-        $dbMatch['match_order'] = isset($data['match_order']) ? $data['match_order'] : $dbMatch['match_order'];
-        $dbMatch['double_rotation_state'] = isset($data['doubleRotationState']) ? json_encode($data['doubleRotationState']) : $dbMatch['double_rotation_state'];
+        // $dbMatch zůstává s hodnotami z DB – porovnání s $data pak správně určí hasChanges a případně provede INSERT nové verze
     }
 
     // Normalizace hodnot pro porovnání (NULL -> 0 nebo false)
@@ -574,7 +598,12 @@ function handleUpdateMatch($conn, $payload) {
             $sql .= "NULL, ";
         }
         
-        $sql .= "?, ?, ?)";
+        // double_rotation_state může být NULL – nebindujeme jako "s"
+        if ($normalizedRotationState === null) {
+            $sql .= "?, ?, NULL)";
+        } else {
+            $sql .= "?, ?, ?)";
+        }
         
         $stmtInsert = $conn->prepare($sql);
         if (!$stmtInsert) {
@@ -621,13 +650,16 @@ function handleUpdateMatch($conn, $payload) {
             $bindParams[] = &$bindServingPlayer;
         }
         
-        $types .= "iis";
+        $types .= "ii";
         $bindMatchOrder = $matchOrder;
         $bindSidesSwapped = $dataSidesSwapped;
-        $bindRotationState = $normalizedRotationState;
         $bindParams[] = &$bindMatchOrder;
         $bindParams[] = &$bindSidesSwapped;
-        $bindParams[] = &$bindRotationState;
+        if ($normalizedRotationState !== null) {
+            $types .= "s";
+            $bindRotationState = $normalizedRotationState;
+            $bindParams[] = &$bindRotationState;
+        }
         
         // Použijeme call_user_func_array pro bind_param s dynamickým počtem parametrů
         $bindResult = call_user_func_array([$stmtInsert, 'bind_param'], $bindParams);
