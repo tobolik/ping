@@ -57,6 +57,15 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             z-index: 40;
             overflow: hidden;
+            min-width: 200px;
+        }
+        @media (max-width: 768px) {
+            .settings-menu {
+                right: 0;
+                left: auto;
+                max-width: calc(100vw - 1rem);
+                transform: translateX(0);
+            }
         }
         .settings-menu button, .settings-menu label {
             display: block;
@@ -126,6 +135,32 @@
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slide-in-right {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        .animate-slide-in-right {
+            animation: slide-in-right 0.3s ease-out;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+        }
+        @media (max-width: 768px) {
+            #toast-container {
+                bottom: 1rem;
+                right: 1rem;
+                left: 1rem;
+            }
+            #toast-container > div {
+                max-width: 100%;
+            }
+        }
 
         /* PDF Export Styles */
         .pdf-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
