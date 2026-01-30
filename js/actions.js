@@ -116,7 +116,7 @@ export const updateScore = async (playerId, delta, sideOverride = null) => {
         // 1. Okamžité vykreslení (optimistické UI)
         renderGameBoard();
 
-        const shouldReportScore = state.settings.voiceAssistEnabled || state.settings.voiceInputEnabled;
+        const shouldReportScore = state.settings.voiceAssistEnabled;
 
         if (shouldReportScore) {
             const side1Players = getSidePlayerIds(t, m, 1);
@@ -132,7 +132,7 @@ export const updateScore = async (playerId, delta, sideOverride = null) => {
                     const winnerLabel = formatPlayersLabel(winnerSide === 1 ? side1Players : side2Players);
                     const winnerScore = Math.max(m.score1, m.score2);
                     const loserScore = Math.min(m.score1, m.score2);
-                    speak(`Konec zápasu. Vítěz ${winnerLabel}. ${winnerScore} : ${loserScore}`, true);
+                    speak(`Konec zápasu. Vítěz ${winnerLabel}. ${winnerScore} : ${loserScore}`);
                 }
             } else if (servingLabel) {
                 let speechText = `${servingLabel}, ${servingPlayerScore} : ${otherPlayerScore}`;
@@ -156,7 +156,7 @@ export const updateScore = async (playerId, delta, sideOverride = null) => {
                         speechText += `, ${selectedPhrase}`;
                     }
                 }
-                speak(speechText, state.settings.voiceInputEnabled);
+                speak(speechText);
             }
         }
 
@@ -539,7 +539,7 @@ export const allActions = {
             doubleRotationState: m.doubleRotationState !== undefined ? m.doubleRotationState : (m.double_rotation_state !== undefined ? m.double_rotation_state : null)
         };
         await apiCall('updateMatch', { id: m.id, data: matchPayload });
-        if (state.settings.voiceAssistEnabled || state.settings.voiceInputEnabled) {
+        if (state.settings.voiceAssistEnabled) {
             let servingPlayerName = '';
             if (isDoubleTournament(t)) {
                 if (m.doubleRotationState && m.doubleRotationState.order && m.doubleRotationState.order.length > 0) {
@@ -564,7 +564,7 @@ export const allActions = {
                 }
             }
             if (servingPlayerName) {
-                speak(servingPlayerName, state.settings.voiceInputEnabled);
+                speak(servingPlayerName);
             }
         }
         closeModal();
