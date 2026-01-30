@@ -112,6 +112,9 @@ export const updateScore = async (playerId, delta, sideOverride = null) => {
             recalculateServiceState(m, t);
         }
         playSound(scoringSide);
+        
+        // 1. Okamžité vykreslení (optimistické UI)
+        renderGameBoard();
 
         const shouldReportScore = state.settings.voiceAssistEnabled || state.settings.voiceInputEnabled;
 
@@ -159,8 +162,6 @@ export const updateScore = async (playerId, delta, sideOverride = null) => {
 
         const matchPayload = { ...m, tournament_id: t.id, match_order: t.matches.findIndex(match => match.id == m.id) };
         await apiCall('updateMatch', { id: m.id, data: matchPayload });
-
-        renderGameBoard();
     }
 };
 
