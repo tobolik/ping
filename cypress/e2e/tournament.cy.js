@@ -154,9 +154,9 @@ describe('Průběh turnaje', () => {
       cy.get('[data-action="set-first-server"][data-player-id="1"]').click();
       cy.wait('@updateMatch');
 
-      // 4. Play the match - click 11 times for player 1 to win
+      // 4. Play the match - click 11 times for side 1 to win
       for (let i = 0; i < 11; i++) {
-        cy.get('[data-action="add-point"][data-player-id="1"]').click();
+        cy.get('[data-action="add-point"][data-side="1"]').click();
       }
       cy.wait('@updateMatch'); // Wait for the final score update
 
@@ -287,12 +287,12 @@ describe('Přerušení a pokračování v zápase', () => {
       cy.get('[data-action="play-match"]').click();
       cy.get('[data-action="set-first-server"][data-player-id="1"]').click();
       
-      // Click multiple times, re-querying the element each time
+      // Click multiple times, re-querying the element each time (data-side = left/right side, not player id)
       for (let i = 0; i < 3; i++) {
-        cy.get('[data-action="add-point"][data-player-id="1"]').click();
+        cy.get('[data-action="add-point"][data-side="1"]').click();
       }
       for (let i = 0; i < 2; i++) {
-        cy.get('[data-action="add-point"][data-player-id="2"]').click();
+        cy.get('[data-action="add-point"][data-side="2"]').click();
       }
       cy.wait('@updateMatch');
 
