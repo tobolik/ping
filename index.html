@@ -7,6 +7,22 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>🏓 Ping pong turnaje</title>
+    <!-- Cache busting script -->
+    <script>
+        (function() {
+            // Kontrola verze a reload s parametrem
+            const currentVersion = '1.1.1'; 
+            const urlParams = new URLSearchParams(window.location.search);
+            const vParam = urlParams.get('v');
+            if (vParam !== currentVersion) {
+                // Pokud verze v URL nesedí, přesměrujeme na novou verzi
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.set('v', currentVersion);
+                // Nahradíme historii, aby se uživatel nemohl vrátit zpět na starou verzi tlačítkem Zpět
+                window.location.replace(newUrl.toString());
+            }
+        })();
+    </script>
     <script>
         // Potlačení varování a chyb o produkčním použití Tailwind CSS CDN a CSP - MUSÍ být před načtením Tailwind CDN
         (function() {
