@@ -9,9 +9,11 @@ import { getTournament, getMatch } from './utils.js';
 import { checkWinCondition } from './game-logic.js';
 import { initializeAudio, speak } from './audio.js';
 import { voiceInput } from './voice-input.js';
+import { APP_VERSION } from './constants.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     initUI();
+    document.getElementById('app-version').textContent = APP_VERSION;
     
     // Inicializace voice input s potřebnými akcemi
     voiceInput.init({
