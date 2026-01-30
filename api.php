@@ -300,25 +300,46 @@ function handleSwapSides($conn, $payload) {
         return;
     }
 
-    // 3. Vložíme nový záznam s prohozenou hodnotou
+    // 3. Vložíme nový záznam s prohozenou hodnotou (double_rotation_state může být NULL – nebindujeme jako "s")
     $newSidesSwapped = !$dbMatch['sides_swapped'];
-    $stmtInsert = $conn->prepare("INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, team1_id, team2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped, double_rotation_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmtInsert->bind_param("iiiiiiiiiiiiis", 
-        $matchId, 
-        $dbMatch['tournament_id'], 
-        $dbMatch['player1_id'], 
-        $dbMatch['player2_id'], 
-        $dbMatch['team1_id'],
-        $dbMatch['team2_id'],
-        $dbMatch['score1'], 
-        $dbMatch['score2'], 
-        $dbMatch['completed'], 
-        $dbMatch['first_server'], 
-        $dbMatch['serving_player'], 
-        $dbMatch['match_order'], 
-        $newSidesSwapped,
-        $dbMatch['double_rotation_state']
-    );
+    $rotVal = $dbMatch['double_rotation_state'] ?? null;
+    $rotPlaceholder = $rotVal === null ? "NULL" : "?";
+    $sqlInsert = "INSERT INTO matches (entity_id, tournament_id, player1_id, player2_id, team1_id, team2_id, score1, score2, completed, first_server, serving_player, match_order, sides_swapped, double_rotation_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, $rotPlaceholder)";
+    $stmtInsert = $conn->prepare($sqlInsert);
+    if ($rotVal === null) {
+        $stmtInsert->bind_param("iiiiiiiiiiiii", 
+            $matchId, 
+            $dbMatch['tournament_id'], 
+            $dbMatch['player1_id'], 
+            $dbMatch['player2_id'], 
+            $dbMatch['team1_id'],
+            $dbMatch['team2_id'],
+            $dbMatch['score1'], 
+            $dbMatch['score2'], 
+            $dbMatch['completed'], 
+            $dbMatch['first_server'], 
+            $dbMatch['serving_player'], 
+            $dbMatch['match_order'], 
+            $newSidesSwapped
+        );
+    } else {
+        $stmtInsert->bind_param("iiiiiiiiiiiiis", 
+            $matchId, 
+            $dbMatch['tournament_id'], 
+            $dbMatch['player1_id'], 
+            $dbMatch['player2_id'], 
+            $dbMatch['team1_id'],
+            $dbMatch['team2_id'],
+            $dbMatch['score1'], 
+            $dbMatch['score2'], 
+            $dbMatch['completed'], 
+            $dbMatch['first_server'], 
+            $dbMatch['serving_player'], 
+            $dbMatch['match_order'], 
+            $newSidesSwapped,
+            $rotVal
+        );
+    }
     if (!$stmtInsert->execute()) {
         error_log("handleSwapSides: Failed to insert new match: " . $stmtInsert->error);
         return;
@@ -572,7 +593,12 @@ function handleUpdateMatch($conn, $payload) {
             $sql .= "NULL, ";
         }
         
-        $sql .= "?, ?, ?)";
+        // double_rotation_state může být NULL – nebindujeme jako "s"
+        if ($normalizedRotationState === null) {
+            $sql .= "?, ?, NULL)";
+        } else {
+            $sql .= "?, ?, ?)";
+        }
         
         $stmtInsert = $conn->prepare($sql);
         if (!$stmtInsert) {
@@ -619,13 +645,16 @@ function handleUpdateMatch($conn, $payload) {
             $bindParams[] = &$bindServingPlayer;
         }
         
-        $types .= "iis";
+        $types .= "ii";
         $bindMatchOrder = $matchOrder;
         $bindSidesSwapped = $dataSidesSwapped;
-        $bindRotationState = $normalizedRotationState;
         $bindParams[] = &$bindMatchOrder;
         $bindParams[] = &$bindSidesSwapped;
-        $bindParams[] = &$bindRotationState;
+        if ($normalizedRotationState !== null) {
+            $types .= "s";
+            $bindRotationState = $normalizedRotationState;
+            $bindParams[] = &$bindRotationState;
+        }
         
         // Použijeme call_user_func_array pro bind_param s dynamickým počtem parametrů
         $bindResult = call_user_func_array([$stmtInsert, 'bind_param'], $bindParams);
