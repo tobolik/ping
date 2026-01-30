@@ -10,7 +10,7 @@ import { checkWinCondition } from './game-logic.js';
 import { initializeAudio, speak } from './audio.js';
 import { voiceInput } from './voice-input.js';
 // APP_VERSION definujeme zde, abychom se vyhnuli problémům s cachováním constants.js
-const APP_VERSION = '1.1.2';
+const APP_VERSION = '1.1.3';
 
 document.addEventListener('DOMContentLoaded', () => {
     initUI();
