@@ -10,7 +10,7 @@ import { checkWinCondition } from './game-logic.js';
 import { initializeAudio, speak } from './audio.js';
 import { voiceInput } from './voice-input.js';
 // APP_VERSION definujeme zde, abychom se vyhnuli problémům s cachováním constants.js
-const APP_VERSION = '1.1.4';
+const APP_VERSION = '1.1.5';
 
 document.addEventListener('DOMContentLoaded', () => {
     initUI();
@@ -21,15 +21,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
 
     if (!isProduction && !isLocal) {
-        // Jsme na testovacím serveru (pravděpodobně Railway)
-        const ribbon = document.createElement('div');
-        ribbon.className = 'fixed top-0 left-0 w-full bg-orange-500 text-white text-center text-xs font-bold py-1 z-50 shadow-md pointer-events-none';
-        ribbon.textContent = '🚧 TESTOVACÍ PROSTŘEDÍ 🚧';
-        document.body.prepend(ribbon);
+        // Jsme na testovacím serveru - decentní vizuální odlišení
         
-        // Posunout obsah dolů, aby nebyl překryt pruhem
-        const app = document.getElementById('app');
-        if (app) app.style.marginTop = '24px';
+        // 1. Oranžový proužek nahoře
+        document.body.style.borderTop = "4px solid #f97316"; 
+
+        // 2. Vodoznak na pozadí (neinteraktivní)
+        const watermark = document.createElement('div');
+        watermark.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 15vh; color: rgba(249, 115, 22, 0.05); font-weight: 900; z-index: 9999; pointer-events: none; white-space: nowrap; user-select: none;';
+        watermark.textContent = 'TEST';
+        document.body.appendChild(watermark);
         
         document.title = '[TEST] ' + document.title;
     }
