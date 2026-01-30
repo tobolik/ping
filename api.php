@@ -68,7 +68,7 @@ if ($method === 'POST') {
             case 'swapSides':
                 handleSwapSides($conn, $payload);
                 $conn->commit();
-                handleGetData($conn);
+                echo json_encode(['success' => true]);
                 exit();
             case 'toggleTournamentLock':
                 handleToggleTournamentLock($conn, $payload);
@@ -485,17 +485,7 @@ function handleUpdateMatch($conn, $payload) {
             error_log("handleUpdateMatch: Zápas s entity_id $id nebyl nalezen ani v historii");
             return;
         }
-        // Použijeme hodnoty z dat, pokud jsou k dispozici, jinak z posledního záznamu
-        $dbMatch['score1'] = isset($data['score1']) ? $data['score1'] : $dbMatch['score1'];
-        $dbMatch['score2'] = isset($data['score2']) ? $data['score2'] : $dbMatch['score2'];
-        $dbMatch['completed'] = isset($data['completed']) ? $data['completed'] : $dbMatch['completed'];
-        $dbMatch['first_server'] = isset($data['firstServer']) ? $data['firstServer'] : $dbMatch['first_server'];
-        $dbMatch['serving_player'] = isset($data['servingPlayer']) ? $data['servingPlayer'] : $dbMatch['serving_player'];
-        $dbMatch['sides_swapped'] = isset($data['sidesSwapped']) ? ($data['sidesSwapped'] ? 1 : 0) : $dbMatch['sides_swapped'];
-        $dbMatch['team1_id'] = isset($data['team1Id']) ? $data['team1Id'] : $dbMatch['team1_id'];
-        $dbMatch['team2_id'] = isset($data['team2Id']) ? $data['team2Id'] : $dbMatch['team2_id'];
-        $dbMatch['match_order'] = isset($data['match_order']) ? $data['match_order'] : $dbMatch['match_order'];
-        $dbMatch['double_rotation_state'] = isset($data['doubleRotationState']) ? json_encode($data['doubleRotationState']) : $dbMatch['double_rotation_state'];
+        // $dbMatch zůstává s hodnotami z DB – porovnání s $data pak správně určí hasChanges a případně provede INSERT nové verze
     }
 
     // Normalizace hodnot pro porovnání (NULL -> 0 nebo false)
