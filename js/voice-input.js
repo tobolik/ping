@@ -12,6 +12,7 @@ class VoiceInputManager {
         this.context = 'game'; // 'game' | 'setup'
         this.lang = 'cs-CZ';
         this.restartTimer = null;
+        this.processedIndices = new Set();
         
         // Mapování českých příkazů na klíče akcí
         this.commandMap = {
@@ -35,7 +36,7 @@ class VoiceInputManager {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             this.recognition = new SpeechRecognition();
             this.recognition.continuous = true;
-            this.recognition.interimResults = false;
+            this.recognition.interimResults = true;
             this.recognition.lang = this.lang;
 
             this.recognition.onresult = (event) => this.handleResult(event);
@@ -114,22 +115,37 @@ class VoiceInputManager {
     }
 
     handleResult(event) {
-        if (!event.results || event.results.length === 0) return;
-        
-        const last = event.results.length - 1;
-        const result = event.results[last];
-        
-        if (!result.isFinal) return; // Zpracováváme jen finální výsledky
+        if (!event.results) return;
 
-        const text = result[0].transcript.trim().toLowerCase();
-        console.log('VoiceInput received:', text, 'Context:', this.context);
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (this.processedIndices.has(i)) continue;
+
+            const result = event.results[i];
+            const text = result[0].transcript.trim().toLowerCase();
+            const isFinal = result.isFinal;
+
+            console.log(`VoiceInput [${isFinal ? 'FINAL' : 'INTERIM'}]:`, text);
+
+            if (this.processText(text)) {
+                this.processedIndices.add(i);
+                // Pokud jsme úspěšně zpracovali příkaz, můžeme volitelně restartovat pro vyčištění bufferu,
+                // ale pro plynulost to zatím neděláme, spoléháme na processedIndices.
+            }
+        }
+    }
+
+    processText(text) {
+        console.log('Processing text:', text, 'Context:', this.context);
 
         // 1. Kontrola příkazů pro daný kontext
         const contextCommands = this.commandMap[this.context] || {};
         for (const [phrase, actionKey] of Object.entries(contextCommands)) {
+            // Použijeme regex pro přesnější shodu celých slov/frází, abychom se vyhnuli
+            // částečným shodám v interim výsledcích (např. "pau" vs "pauza")
+            // Ale pro víceslovné fráze jako "vyměnit strany" stačí includes, pokud je fráze unikátní.
             if (text.includes(phrase)) {
                 this.executeAction(actionKey);
-                return;
+                return true;
             }
         }
 
@@ -148,9 +164,8 @@ class VoiceInputManager {
                     const player = getGlobalPlayer(playerId);
                     const name = player.nickname || player.name;
                     showToast(`Bod pro: ${name} (hlasem)`, 'success');
+                    return true;
                 }
-            } else {
-                 console.log('VoiceInput: Žádná shoda pro', text);
             }
         } 
         // 3. Logika pro 'setup' kontext (výběr podání)
@@ -161,9 +176,12 @@ class VoiceInputManager {
                     this.actions.setFirstServer(playerId);
                     const player = getGlobalPlayer(playerId);
                     showToast(`První podání: ${player.name} (hlasem)`, 'success');
+                    return true;
                 }
             }
         }
+        
+        return false;
     }
 
     executeAction(actionKey) {
@@ -221,6 +239,7 @@ class VoiceInputManager {
     }
 
     handleEnd() {
+        this.processedIndices.clear();
         if (this.isListening) {
              // Pokud má poslouchat, ale API se zastavilo (např. ticho), restartujeme
              this.restartTimer = setTimeout(() => {
