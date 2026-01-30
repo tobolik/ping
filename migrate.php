@@ -36,18 +36,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
                 // Přečtení obsahu souboru
                 $sqlContent = file_get_contents($file['tmp_name']);
                 
+                // Odstranění blokových komentářů /* ... */
+                $sqlContent = preg_replace('!/\*.*?\*/!s', '', $sqlContent);
+                
                 // Vypnutí kontroly cizích klíčů pro hladký import
                 $mysqli->query("SET FOREIGN_KEY_CHECKS = 0");
                 
-                // Rozdělení na jednotlivé příkazy (jednoduché parsování)
-                // Poznámka: Toto nemusí fungovat pro složité procedury nebo triggery, ale pro běžné dumpy ano
+                // Rozdělení na jednotlivé příkazy
                 $queries = [];
                 $lines = explode("\n", $sqlContent);
                 $query = "";
                 
                 foreach ($lines as $line) {
                     $trimLine = trim($line);
-                    if ($trimLine === "" || strpos($trimLine, "--") === 0 || strpos($trimLine, "#") === 0 || strpos($trimLine, "/*") === 0) {
+                    // Přeskočení prázdných řádků a řádkových komentářů
+                    if ($trimLine === "" || strpos($trimLine, "--") === 0 || strpos($trimLine, "#") === 0) {
                         continue;
                     }
                     
