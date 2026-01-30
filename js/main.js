@@ -9,7 +9,8 @@ import { getTournament, getMatch } from './utils.js';
 import { checkWinCondition } from './game-logic.js';
 import { initializeAudio, speak } from './audio.js';
 import { voiceInput } from './voice-input.js';
-import { APP_VERSION } from './constants.js';
+// APP_VERSION definujeme zde, abychom se vyhnuli problémům s cachováním constants.js
+const APP_VERSION = '1.1.0';
 
 document.addEventListener('DOMContentLoaded', () => {
     initUI();
