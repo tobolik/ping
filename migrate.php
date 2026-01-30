@@ -66,8 +66,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
                 $firstError = "";
 
                 foreach ($queries as $q) {
-                    if (trim($q) != "") {
-                        if ($mysqli->query($q)) {
+                    $trimmedQ = trim($q);
+                    if (!empty($trimmedQ)) {
+                        if ($mysqli->query($trimmedQ)) {
                             $successCount++;
                         } else {
                             $errorCount++;
