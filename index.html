@@ -11,7 +11,7 @@
     <script>
         (function() {
             // Kontrola verze a reload s parametrem
-            const currentVersion = '1.1.1'; 
+            const currentVersion = '1.1.2'; 
             const urlParams = new URLSearchParams(window.location.search);
             const vParam = urlParams.get('v');
             if (vParam !== currentVersion) {
@@ -22,6 +22,26 @@
                 window.location.replace(newUrl.toString());
             }
         })();
+    </script>
+    <script type="importmap">
+    {
+        "imports": {
+            "./js/actions.js": "./js/actions.js?v=1.1.2",
+            "./js/api.js": "./js/api.js?v=1.1.2",
+            "./js/audio.js": "./js/audio.js?v=1.1.2",
+            "./js/autocomplete.js": "./js/autocomplete.js?v=1.1.2",
+            "./js/constants.js": "./js/constants.js?v=1.1.2",
+            "./js/game-logic.js": "./js/game-logic.js?v=1.1.2",
+            "./js/main.js": "./js/main.js?v=1.1.2",
+            "./js/render.js": "./js/render.js?v=1.1.2",
+            "./js/state.js": "./js/state.js?v=1.1.2",
+            "./js/stats.js": "./js/stats.js?v=1.1.2",
+            "./js/ui.js": "./js/ui.js?v=1.1.2",
+            "./js/utils.js": "./js/utils.js?v=1.1.2",
+            "./js/voice-input.js": "./js/voice-input.js?v=1.1.2",
+            "./js/utils/tournament-utils.js": "./js/utils/tournament-utils.js?v=1.1.2"
+        }
+    }
     </script>
     <script>
         // Potlačení varování a chyb o produkčním použití Tailwind CSS CDN a CSP - MUSÍ být před načtením Tailwind CDN
@@ -82,6 +102,9 @@
         import * as Actions from './js/actions.js';
         import { setupAutocomplete } from './js/autocomplete.js';
         import { generateUniqueTournamentName } from './js/utils/tournament-utils.js';
+
+        // Explicitně nastavíme verzi zde, pokud by main.js selhal
+        document.getElementById('app-version').textContent = '1.1.2';
 
         Object.assign(window, {
             // konstanty a state

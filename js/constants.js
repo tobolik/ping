@@ -3,7 +3,7 @@ export const TOURNAMENT_TYPES = { SINGLE: 'single', DOUBLE: 'double' };
 export const playerColors = ["bg-red-500", "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-yellow-500", "bg-pink-500", "bg-indigo-500", "bg-teal-500"];
 export const STORAGE_KEY = 'pingPongTournamentData';
 export const API_URL = 'api.php';
-export const APP_VERSION = '1.1.1';
+export const APP_VERSION = '1.1.2';
 
 // Motivační hlášky rozdělené podle situace
 export const encouragingPhrases = {

@@ -10,11 +10,14 @@ import { checkWinCondition } from './game-logic.js';
 import { initializeAudio, speak } from './audio.js';
 import { voiceInput } from './voice-input.js';
 // APP_VERSION definujeme zde, abychom se vyhnuli problémům s cachováním constants.js
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.1.2';
 
 document.addEventListener('DOMContentLoaded', () => {
     initUI();
-    document.getElementById('app-version').textContent = APP_VERSION;
+    
+    // Znovu nastavíme verzi pro jistotu
+    const versionEl = document.getElementById('app-version');
+    if (versionEl) versionEl.textContent = APP_VERSION;
     
     // Inicializace voice input s potřebnými akcemi
     voiceInput.init({
