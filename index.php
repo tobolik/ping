@@ -15,20 +15,20 @@ header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
     <script type="importmap">
     {
         "imports": {
-            "./js/actions.js": "./js/actions.js?v=1.1.3",
-            "./js/api.js": "./js/api.js?v=1.1.3",
-            "./js/audio.js": "./js/audio.js?v=1.1.3",
-            "./js/autocomplete.js": "./js/autocomplete.js?v=1.1.3",
-            "./js/constants.js": "./js/constants.js?v=1.1.3",
-            "./js/game-logic.js": "./js/game-logic.js?v=1.1.3",
-            "./js/main.js": "./js/main.js?v=1.1.3",
-            "./js/render.js": "./js/render.js?v=1.1.3",
-            "./js/state.js": "./js/state.js?v=1.1.3",
-            "./js/stats.js": "./js/stats.js?v=1.1.3",
-            "./js/ui.js": "./js/ui.js?v=1.1.3",
-            "./js/utils.js": "./js/utils.js?v=1.1.3",
-            "./js/voice-input.js": "./js/voice-input.js?v=1.1.3",
-            "./js/utils/tournament-utils.js": "./js/utils/tournament-utils.js?v=1.1.3"
+            "./js/actions.js": "./js/actions.js?v=1.1.4",
+            "./js/api.js": "./js/api.js?v=1.1.4",
+            "./js/audio.js": "./js/audio.js?v=1.1.4",
+            "./js/autocomplete.js": "./js/autocomplete.js?v=1.1.4",
+            "./js/constants.js": "./js/constants.js?v=1.1.4",
+            "./js/game-logic.js": "./js/game-logic.js?v=1.1.4",
+            "./js/main.js": "./js/main.js?v=1.1.4",
+            "./js/render.js": "./js/render.js?v=1.1.4",
+            "./js/state.js": "./js/state.js?v=1.1.4",
+            "./js/stats.js": "./js/stats.js?v=1.1.4",
+            "./js/ui.js": "./js/ui.js?v=1.1.4",
+            "./js/utils.js": "./js/utils.js?v=1.1.4",
+            "./js/voice-input.js": "./js/voice-input.js?v=1.1.4",
+            "./js/utils/tournament-utils.js": "./js/utils/tournament-utils.js?v=1.1.4"
         }
     }
     </script>
@@ -93,7 +93,7 @@ header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
         import { generateUniqueTournamentName } from './js/utils/tournament-utils.js';
 
         // Explicitně nastavíme verzi zde, pokud by main.js selhal
-        document.getElementById('app-version').textContent = '1.1.3';
+        document.getElementById('app-version').textContent = '1.1.4';
 
         Object.assign(window, {
             // konstanty a state
@@ -208,6 +208,6 @@ header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
         </footer>
     </div>
 
-<script type="module" src="js/main.js?v=1.1.3"></script>
+<script type="module" src="js/main.js?v=1.1.4"></script>
 </body>
 </html>
