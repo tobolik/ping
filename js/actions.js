@@ -113,7 +113,9 @@ export const updateScore = async (playerId, delta, sideOverride = null) => {
         }
         playSound(scoringSide);
 
-        if (state.settings.voiceAssistEnabled) {
+        const shouldReportScore = state.settings.voiceAssistEnabled || state.settings.voiceInputEnabled;
+
+        if (shouldReportScore) {
             const side1Players = getSidePlayerIds(t, m, 1);
             const side2Players = getSidePlayerIds(t, m, 2);
             const servingSide = side1Players.includes(m.servingPlayer) ? 1 : (side2Players.includes(m.servingPlayer) ? 2 : null);
@@ -127,7 +129,7 @@ export const updateScore = async (playerId, delta, sideOverride = null) => {
                     const winnerLabel = formatPlayersLabel(winnerSide === 1 ? side1Players : side2Players);
                     const winnerScore = Math.max(m.score1, m.score2);
                     const loserScore = Math.min(m.score1, m.score2);
-                    speak(`Konec zápasu. Vítěz ${winnerLabel}. ${winnerScore} : ${loserScore}`);
+                    speak(`Konec zápasu. Vítěz ${winnerLabel}. ${winnerScore} : ${loserScore}`, true);
                 }
             } else if (servingLabel) {
                 let speechText = `${servingLabel}, ${servingPlayerScore} : ${otherPlayerScore}`;
@@ -151,7 +153,7 @@ export const updateScore = async (playerId, delta, sideOverride = null) => {
                         speechText += `, ${selectedPhrase}`;
                     }
                 }
-                speak(speechText);
+                speak(speechText, state.settings.voiceInputEnabled);
             }
         }
 
@@ -536,7 +538,7 @@ export const allActions = {
             doubleRotationState: m.doubleRotationState !== undefined ? m.doubleRotationState : (m.double_rotation_state !== undefined ? m.double_rotation_state : null)
         };
         await apiCall('updateMatch', { id: m.id, data: matchPayload });
-        if (state.settings.voiceAssistEnabled) {
+        if (state.settings.voiceAssistEnabled || state.settings.voiceInputEnabled) {
             let servingPlayerName = '';
             if (isDoubleTournament(t)) {
                 if (m.doubleRotationState && m.doubleRotationState.order && m.doubleRotationState.order.length > 0) {
@@ -561,7 +563,7 @@ export const allActions = {
                 }
             }
             if (servingPlayerName) {
-                speak(servingPlayerName);
+                speak(servingPlayerName, state.settings.voiceInputEnabled);
             }
         }
         closeModal();
