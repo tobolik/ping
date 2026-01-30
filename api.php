@@ -20,8 +20,16 @@ try {
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 
-// Zkusíme připojení pomocí MySQLi (podle testu funguje)
-$conn = @new mysqli($config['db']['host'], $config['db']['user'], $config['db']['pass'], $config['db']['name']);
+// Při chybějícím .env vrátíme srozumitelnou chybu (bez volání mysqli s null)
+$db = $config['db'];
+if (empty($db['name']) || $db['user'] === null || $db['user'] === '') {
+    http_response_code(503);
+    error_log('DB not configured: missing .env (DB_NAME, DB_USER, DB_PASS). Copy .env.example to .env or .env.localhost.');
+    echo json_encode(['error' => 'Database not configured. Copy .env.example to .env (or .env.localhost) and set DB_NAME, DB_USER, DB_PASS.']);
+    exit();
+}
+
+$conn = @new mysqli($db['host'], $db['user'], $db['pass'] ?? '', $db['name']);
 
 if ($conn->connect_error) {
     http_response_code(500);
