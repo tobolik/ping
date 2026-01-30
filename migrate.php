@@ -49,8 +49,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
                 
                 foreach ($lines as $line) {
                     $trimLine = trim($line);
-                    // Přeskočení prázdných řádků a řádkových komentářů
-                    if ($trimLine === "" || strpos($trimLine, "--") === 0 || strpos($trimLine, "#") === 0) {
+                    // Přeskočení prázdných řádků a řádkových komentářů a direktiv začínajících /*!
+                    if ($trimLine === "" || 
+                        strpos($trimLine, "--") === 0 || 
+                        strpos($trimLine, "#") === 0 || 
+                        (strpos($trimLine, "/*") === 0 && strpos($trimLine, "/*!") !== 0) || // Obyčejný blokový komentář na začátku řádku
+                        strpos($trimLine, "/*!") === 0) { // MySQL direktiva na začátku řádku
                         continue;
                     }
                     
