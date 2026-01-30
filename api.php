@@ -472,6 +472,7 @@ function handleUpdateMatch($conn, $payload) {
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $dbMatch = $stmt->get_result()->fetch_assoc();
+    $foundCurrentRecord = (bool) $dbMatch;
 
     // Pokud nenajdeme platný záznam, zkusíme najít poslední záznam (i když má valid_to)
     if (!$dbMatch) {
@@ -526,9 +527,12 @@ function handleUpdateMatch($conn, $payload) {
     );
 
     if ($hasChanges) {
-        $stmtUpdate = $conn->prepare("UPDATE matches SET valid_to = NOW() WHERE entity_id = ? AND valid_to IS NULL");
-        $stmtUpdate->bind_param("i", $id);
-        $stmtUpdate->execute();
+        // Invalidovat aktuální záznam jen pokud existuje (valid_to IS NULL). Při fallbacku na historický záznam žádný aktuální záznam není – nevoláme UPDATE.
+        if ($foundCurrentRecord) {
+            $stmtUpdate = $conn->prepare("UPDATE matches SET valid_to = NOW() WHERE entity_id = ? AND valid_to IS NULL");
+            $stmtUpdate->bind_param("i", $id);
+            $stmtUpdate->execute();
+        }
 
         // Zajistíme, že všechny hodnoty jsou správně definované
         // Pro player1Id a player2Id musíme použít hodnotu z databáze, pokud není v datech (NOT NULL constraint)

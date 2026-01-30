@@ -133,6 +133,14 @@ Pro přidání nových sloupců nebo změny struktury použijte migrační skrip
 
 ## 🎮 Funkcionality
 
+### Uživatelské rozhraní
+
+Aplikace má responzivní design optimalizovaný pro mobilní zařízení i desktop:
+
+- **Toast notifikace**: Po úspěšném vytvoření turnaje nebo uložení nastavení se zobrazí mizející upozornění vpravo dole
+- **Mobilní optimalizace**: Tlačítka se automaticky přizpůsobí úzkým displejům, aby zůstala viditelná
+- **Inteligentní autocomplete**: Při vytváření turnaje se seznam hráčů zobrazí automaticky a zůstane otevřený, dokud není dosaženo minimálního počtu hráčů (2 pro dvouhru, 4 pro čtyřhru)
+
 ### Kopírování turnaje
 
 Aplikace umožňuje rychlé kopírování turnaje pro pokračování s novým turnajem:
@@ -153,7 +161,10 @@ Aplikace umožňuje rychlé kopírování turnaje pro pokračování s novým tu
   - Nový turnaj je připraven k okamžitému spuštění
 
 **Výběr hráčů:**
-- Při kliknutí do inputu pro výběr hráče se okamžitě zobrazí seznam dostupných hráčů (maximálně 10)
+- Při otevření modalu pro vytvoření turnaje se okamžitě zobrazí seznam dostupných hráčů (maximálně 10)
+- Seznam zůstane otevřený po výběru hráče, dokud není dosažen minimální počet hráčů (2 pro dvouhru, 4 pro čtyřhru)
+- Po dosažení minimálního počtu se seznam automaticky zavře
+- Seznam se znovu otevře při kliknutí do pole pro výběr hráče
 - Seznam se automaticky filtruje při psaní jména hráče
 - Hráči, kteří už jsou v turnaji, se nezobrazují v seznamu
 - Pro výběr hráče klikněte na jeho jméno v seznamu nebo použijte šipky nahoru/dolů a Enter
