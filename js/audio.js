@@ -29,5 +29,6 @@ export function speak(text, force = false) {
     synth.cancel();
     let utterance = new SpeechSynthesisUtterance(text); // Vytvoříme novou instanci pro každou hlášku
     utterance.lang = 'cs-CZ';
+    utterance.volume = state.settings.voiceVolume !== undefined ? state.settings.voiceVolume : 1;
     synth.speak(utterance);
 }

@@ -51,6 +51,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    app.addEventListener('input', (e) => {
+        const volumeSlider = e.target.closest('[data-action="change-voice-volume"]');
+        if (volumeSlider) {
+            const newVolume = parseFloat(volumeSlider.value);
+            state.settings.voiceVolume = newVolume;
+            apiCall('saveSettings', { key: 'voiceVolume', value: newVolume });
+            speak(`Hlasitost ${Math.round(newVolume * 100)} procent`, true);
+        }
+    });
+
     document.getElementById('import-file').addEventListener('change', async (event) => {
         const file = event.target.files[0];
         if (!file) return;

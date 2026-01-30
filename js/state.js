@@ -20,6 +20,7 @@ export function updateStateWithApiData(data) {
     state.settings = {
         soundsEnabled: true,
         voiceAssistEnabled: false,
+        voiceVolume: 1,
         showLockedTournaments: false,
         motivationalPhrasesEnabled: true,
         ...(data.settings || {})
