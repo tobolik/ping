@@ -119,6 +119,10 @@
                                     <div class="absolute left-0 top-0 w-5 h-5 bg-white rounded-full shadow transform transition-transform toggle-label"></div>
                                 </div>
                             </label>
+                            <label class="cursor-pointer flex flex-col gap-2">
+                                <span class="flex items-center text-sm text-gray-700"><i class="fa-solid fa-volume-low w-6 mr-2"></i>Hlasitost asistenta</span>
+                                <input type="range" min="0" max="1" step="0.1" value="1" data-action="change-voice-volume" class="w-full">
+                            </label>
                             <label for="motivational-phrases-toggle" class="cursor-pointer flex items-center justify-between">
                                 <span class="flex items-center"><i class="fa-solid fa-comments w-6 mr-2"></i>Motivační hlášky</span>
                                 <input type="checkbox" id="motivational-phrases-toggle" data-action="toggle-motivational-phrases" class="sr-only">
