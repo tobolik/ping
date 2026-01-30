@@ -387,11 +387,11 @@ export function renderGameBoard() {
                     <p class="text-xs md:text-sm text-gray-500">Hraje se na ${t.pointsToWin} bodů</p>
                     <p class="text-sm md:text-base font-semibold">Podání: ${servingLabel}</p>
                 </div>
-                <div class="w-28 md:w-40 flex justify-end gap-1 md:gap-2">
-                    <button data-action="toggle-voice-input-ingame" class="btn btn-secondary !p-0 h-8 w-8 md:h-10 md:w-10 text-base md:text-lg ${state.settings.voiceInputEnabled ? 'text-red-600' : 'text-gray-400'}" title="Hlasové zadávání bodů">${state.settings.voiceInputEnabled ? '<i class="fa-solid fa-microphone"></i>' : '<i class="fa-solid fa-microphone-slash"></i>'}</button>
-                    <button data-action="toggle-voice-assist-ingame" class="btn btn-secondary !p-0 h-8 w-8 md:h-10 md:w-10 text-base md:text-lg" title="Zapnout/vypnout hlas">${state.settings.voiceAssistEnabled ? '<i class="fa-solid fa-comment-dots"></i>' : '<i class="fa-solid fa-comment-slash"></i>'}</button>
-                    <button data-action="toggle-motivational-phrases-ingame" class="btn btn-secondary !p-0 h-8 w-8 md:h-10 md:w-10 text-base md:text-lg" title="Zapnout/vypnout motivační hlášky">${state.settings.motivationalPhrasesEnabled ? '<i class="fa-solid fa-comments"></i>' : '<i class="fa-solid fa-comment-slash"></i>'}</button>
-                    <button data-action="toggle-sound-ingame" class="btn btn-secondary !p-0 h-8 w-8 md:h-10 md:w-10 text-base md:text-lg" title="Zapnout/vypnout zvuky">${state.settings.soundsEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>'}</button>
+                <div class="w-36 md:w-48 flex justify-end gap-1 md:gap-2">
+                    <button data-action="toggle-voice-input-ingame" class="btn btn-secondary !p-0 h-10 w-10 md:h-12 md:w-12 text-lg md:text-xl ${state.settings.voiceInputEnabled ? 'text-red-600' : 'text-gray-400'}" title="Hlasové zadávání bodů">${state.settings.voiceInputEnabled ? '<i class="fa-solid fa-microphone"></i>' : '<i class="fa-solid fa-microphone-slash"></i>'}</button>
+                    <button data-action="toggle-voice-assist-ingame" class="btn btn-secondary !p-0 h-10 w-10 md:h-12 md:w-12 text-lg md:text-xl" title="Zapnout/vypnout hlas">${state.settings.voiceAssistEnabled ? '<i class="fa-solid fa-comment-dots"></i>' : '<i class="fa-solid fa-comment-slash"></i>'}</button>
+                    <button data-action="toggle-motivational-phrases-ingame" class="btn btn-secondary !p-0 h-10 w-10 md:h-12 md:w-12 text-lg md:text-xl" title="Zapnout/vypnout motivační hlášky">${state.settings.motivationalPhrasesEnabled ? '<i class="fa-solid fa-comments"></i>' : '<i class="fa-solid fa-comment-slash"></i>'}</button>
+                    <button data-action="toggle-sound-ingame" class="btn btn-secondary !p-0 h-10 w-10 md:h-12 md:w-12 text-lg md:text-xl" title="Zapnout/vypnout zvuky">${state.settings.soundsEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>'}</button>
                 </div>
             </header>
             <div class="flex-1 flex flex-row w-full min-h-0">

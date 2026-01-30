@@ -10,7 +10,7 @@ import { checkWinCondition } from './game-logic.js';
 import { initializeAudio, speak } from './audio.js';
 import { voiceInput } from './voice-input.js';
 // APP_VERSION definujeme zde, abychom se vyhnuli problémům s cachováním constants.js
-const APP_VERSION = '1.1.5';
+const APP_VERSION = '1.1.6';
 
 document.addEventListener('DOMContentLoaded', () => {
     initUI();
@@ -23,8 +23,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!isProduction && !isLocal) {
         // Jsme na testovacím serveru - decentní vizuální odlišení
         
-        // 1. Oranžový proužek nahoře
-        document.body.style.borderTop = "4px solid #f97316"; 
+        // 1. Oranžový proužek nahoře (fixní pozice, aby byl vždy vidět, i přes header hry)
+        const border = document.createElement('div');
+        border.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 4px; background-color: #f97316; z-index: 99999; pointer-events: none;';
+        document.body.appendChild(border);
 
         // 2. Vodoznak na pozadí (neinteraktivní)
         const watermark = document.createElement('div');
